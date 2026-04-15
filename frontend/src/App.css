@@ -76,6 +76,7 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(-
 .health-dot{display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text-secondary)}
 .health-dot::before{content:'';width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red)}
 .health-dot.healthy::before{background:var(--green);box-shadow:0 0 8px var(--green)}
+.health-loading{font-size:0.85rem;color:var(--text-muted);font-style:italic}
 
 /* ─── Section Header ─────────────────────────────────────────── */
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}

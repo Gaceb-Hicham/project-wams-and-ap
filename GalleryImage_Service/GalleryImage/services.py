@@ -75,7 +75,7 @@ class AuthService:
     @classmethod
     def is_healthy(cls):
         try:
-            return requests.get(f"{cls._base_url()}/api/auth/health/", timeout=2).status_code == 200
+            return requests.get(f"{cls._base_url()}/api/auth/health/", timeout=0.5).status_code == 200
         except requests.exceptions.RequestException:
             return False
 
@@ -108,7 +108,7 @@ class AIVerificationService:
     @classmethod
     def is_healthy(cls):
         try:
-            return requests.get(f"{cls._base_url()}/api/health/", timeout=2).status_code == 200
+            return requests.get(f"{cls._base_url()}/api/health/", timeout=0.5).status_code == 200
         except requests.exceptions.RequestException:
             return False
 
@@ -126,7 +126,7 @@ class HistoriqueService:
             requests.post(
                 f"{cls._base_url()}/api/history/log/",
                 json={'user_id': user_id, 'action': action, 'details': details or {}, 'service': 'GalleryImage_Service'},
-                timeout=5,
+                timeout=2,
             )
         except requests.exceptions.RequestException as e:
             logger.warning(f"History service unavailable: {e}")
@@ -134,6 +134,6 @@ class HistoriqueService:
     @classmethod
     def is_healthy(cls):
         try:
-            return requests.get(f"{cls._base_url()}/api/health/", timeout=2).status_code == 200
+            return requests.get(f"{cls._base_url()}/api/health/", timeout=0.5).status_code == 200
         except requests.exceptions.RequestException:
             return False

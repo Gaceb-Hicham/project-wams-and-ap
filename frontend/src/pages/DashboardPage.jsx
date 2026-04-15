@@ -6,22 +6,32 @@ import ImageCard from '../components/ImageCard';
 export default function DashboardPage() {
   const [images, setImages] = useState([]);
   const [stats, setStats] = useState({ total: 0, pending: 0, unedited: 0, edited: 0 });
-  const [health, setHealth] = useState({ auth: false, ai: false, historique: false });
+  const [health, setHealth] = useState(null);  // null = still loading
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
+    // Load images + stats first (fast — no timeout issues)
+    const loadMain = async () => {
       try {
-        const [imgRes, statsRes, healthRes] = await Promise.allSettled([
-          getImages(), getStats(), getHealth()
-        ]);
+        const [imgRes, statsRes] = await Promise.allSettled([getImages(), getStats()]);
         if (imgRes.status === 'fulfilled') setImages(imgRes.value.data);
         if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
-        if (healthRes.status === 'fulfilled') setHealth(healthRes.value.data.services);
       } catch (e) { console.error(e); }
-      setLoading(false);
+      setLoading(false);  // Show page immediately
     };
-    load();
+
+    // Load health separately in background (may be slow)
+    const loadHealth = async () => {
+      try {
+        const res = await getHealth();
+        setHealth(res.data.services);
+      } catch (e) {
+        setHealth({ auth: false, ai: false, historique: false });
+      }
+    };
+
+    loadMain();
+    loadHealth();  // Runs in parallel, doesn't block the page
   }, []);
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -38,9 +48,15 @@ export default function DashboardPage() {
       <div className="services-health">
         <h3>🔗 Microservices Status</h3>
         <div className="health-indicators">
-          <span className={`health-dot ${health.auth ? 'healthy' : 'unhealthy'}`}>Auth Service</span>
-          <span className={`health-dot ${health.ai ? 'healthy' : 'unhealthy'}`}>AI Service</span>
-          <span className={`health-dot ${health.historique ? 'healthy' : 'unhealthy'}`}>History Service</span>
+          {health ? (
+            <>
+              <span className={`health-dot ${health.auth ? 'healthy' : 'unhealthy'}`}>Auth Service</span>
+              <span className={`health-dot ${health.ai ? 'healthy' : 'unhealthy'}`}>AI Service</span>
+              <span className={`health-dot ${health.historique ? 'healthy' : 'unhealthy'}`}>History Service</span>
+            </>
+          ) : (
+            <span className="health-loading">Checking services...</span>
+          )}
         </div>
       </div>
 
