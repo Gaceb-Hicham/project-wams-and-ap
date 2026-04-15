@@ -1,0 +1,94 @@
+{% extends "GalleryImage/base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card stat-total">
+            <div class="stat-icon">🖼️</div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.total }}</span>
+                <span class="stat-label">Total Images</span>
+            </div>
+        </div>
+        <div class="stat-card stat-unedited">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.unedited }}</span>
+                <span class="stat-label">Unedited</span>
+            </div>
+        </div>
+        <div class="stat-card stat-edited">
+            <div class="stat-icon">✏️</div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.edited }}</span>
+                <span class="stat-label">Edited</span>
+            </div>
+        </div>
+        <div class="stat-card stat-pending">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.pending }}</span>
+                <span class="stat-label">Pending</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Services Health -->
+    <div class="services-health">
+        <h3>🔗 Microservices Status</h3>
+        <div class="health-indicators">
+            <span class="health-dot {% if services_health.auth %}healthy{% else %}unhealthy{% endif %}">
+                Auth Service
+            </span>
+            <span class="health-dot {% if services_health.ai %}healthy{% else %}unhealthy{% endif %}">
+                AI Service
+            </span>
+            <span class="health-dot {% if services_health.historique %}healthy{% else %}unhealthy{% endif %}">
+                History Service
+            </span>
+        </div>
+    </div>
+
+    <!-- Image Grid -->
+    <div class="section-header">
+        <h2>All Images</h2>
+        <a href="{% url 'gallery:upload' %}" class="btn btn-primary">⬆️ Upload New</a>
+    </div>
+
+    {% if images %}
+    <div class="image-grid">
+        {% for image in images %}
+        <a href="{% url 'gallery:image_detail' image.id %}" class="image-card">
+            <div class="image-wrapper">
+                {% if image.thumbnail %}
+                <img src="{{ image.thumbnail.url }}" alt="{{ image.title }}" loading="lazy">
+                {% elif image.image_file %}
+                <img src="{{ image.image_file.url }}" alt="{{ image.title }}" loading="lazy">
+                {% endif %}
+                <div class="image-overlay">
+                    <span class="view-text">View Details</span>
+                </div>
+            </div>
+            <div class="image-info">
+                <h4 class="image-title">{{ image.title }}</h4>
+                <div class="image-meta">
+                    <span class="status-badge status-{{ image.verification_status }}">
+                        {% if image.verification_status == 'unedited' %}✅ Authentic{% elif image.verification_status == 'edited' %}✏️ Modified{% elif image.verification_status == 'pending' %}⏳ Pending{% elif image.verification_status == 'error' %}❌ Error{% else %}🚫 Rejected{% endif %}
+                    </span>
+                    <span class="image-size">{{ image.file_size_display }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🖼️</div>
+        <h3>Your gallery is empty</h3>
+        <p>Upload your first image to get started with AI verification.</p>
+        <a href="{% url 'gallery:upload' %}" class="btn btn-primary">Upload Image</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

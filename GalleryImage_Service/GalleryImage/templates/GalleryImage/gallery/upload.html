@@ -1,0 +1,110 @@
+{% extends "GalleryImage/base.html" %}
+
+{% block content %}
+<div class="upload-page">
+    <div class="section-header">
+        <h2>⬆️ Upload Image</h2>
+    </div>
+
+    <div class="upload-card">
+        <form method="post" enctype="multipart/form-data" id="upload-form">
+            {% csrf_token %}
+
+            <!-- Drag & Drop Zone -->
+            <div class="drop-zone" id="drop-zone">
+                <div class="drop-zone-content">
+                    <div class="drop-icon">📷</div>
+                    <h3>Drag & drop your image here</h3>
+                    <p>or click to browse files</p>
+                    <p class="drop-hint">Supports: JPEG, PNG, GIF, WebP, BMP, TIFF — Max 50MB</p>
+                </div>
+                <input type="file" name="image_file" id="image-input" accept="image/*" class="file-input" required>
+            </div>
+
+            <!-- Preview -->
+            <div class="preview-container" id="preview-container" style="display:none;">
+                <img id="preview-image" src="" alt="Preview">
+                <button type="button" class="btn btn-danger btn-sm" id="remove-preview">✕ Remove</button>
+            </div>
+
+            <!-- Details -->
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" placeholder="Image title (auto-filled from filename if empty)">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="3" placeholder="Optional description..."></textarea>
+            </div>
+
+            <div class="upload-info-box">
+                <span class="info-icon">🤖</span>
+                <p>After upload, your image will be <strong>automatically sent to the AI service</strong> for authenticity verification. If the AI service is unavailable, you can retry verification later.</p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
+                <span class="btn-text">Upload & Verify</span>
+                <span class="btn-loading" style="display:none;">Uploading...</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('image-input');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImage = document.getElementById('preview-image');
+    const removeBtn = document.getElementById('remove-preview');
+    const titleInput = document.getElementById('title');
+    const form = document.getElementById('upload-form');
+    const submitBtn = document.getElementById('submit-btn');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            showPreview(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) showPreview(e.target.files[0]);
+    });
+
+    function showPreview(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImage.src = e.target.result;
+            previewContainer.style.display = 'block';
+            dropZone.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+        if (!titleInput.value) {
+            titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+        }
+    }
+
+    removeBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        previewContainer.style.display = 'none';
+        dropZone.style.display = 'flex';
+    });
+
+    form.addEventListener('submit', () => {
+        submitBtn.querySelector('.btn-text').style.display = 'none';
+        submitBtn.querySelector('.btn-loading').style.display = 'inline';
+        submitBtn.disabled = true;
+    });
+});
+</script>
+{% endblock %}

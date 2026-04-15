@@ -1,0 +1,103 @@
+{% extends "GalleryImage/base.html" %}
+
+{% block content %}
+<div class="detail-page">
+    <a href="{% url 'gallery:dashboard' %}" class="back-link">← Back to Gallery</a>
+
+    <div class="detail-layout">
+        <!-- Image Display -->
+        <div class="detail-image-container">
+            <img src="{{ image.image_file.url }}" alt="{{ image.title }}" class="detail-image" id="main-image">
+        </div>
+
+        <!-- Info Sidebar -->
+        <div class="detail-sidebar">
+            <h1 class="detail-title">{{ image.title }}</h1>
+
+            <!-- Status Badge -->
+            <div class="detail-status">
+                <span class="status-badge status-{{ image.verification_status }} status-lg">
+                    {% if image.verification_status == 'unedited' %}✅ Authentic (Unedited)
+                    {% elif image.verification_status == 'edited' %}✏️ Modified (Edited)
+                    {% elif image.verification_status == 'pending' %}⏳ Pending Verification
+                    {% elif image.verification_status == 'error' %}❌ Verification Error
+                    {% else %}🚫 Rejected{% endif %}
+                </span>
+            </div>
+
+            {% if image.ai_confidence_score is not None %}
+            <div class="confidence-bar-container">
+                <label>AI Confidence</label>
+                <div class="confidence-bar">
+                    <div class="confidence-fill {% if image.verification_status == 'unedited' %}fill-green{% else %}fill-red{% endif %}"
+                         style="width: {{ image.ai_confidence_score|floatformat:0 }}%">
+                    </div>
+                </div>
+                <span class="confidence-value">{{ image.ai_confidence_score|floatformat:1 }}%</span>
+            </div>
+            {% endif %}
+
+            {% if image.description %}
+            <div class="detail-section">
+                <h3>Description</h3>
+                <p>{{ image.description }}</p>
+            </div>
+            {% endif %}
+
+            <div class="detail-section">
+                <h3>File Information</h3>
+                <div class="info-grid">
+                    <div class="info-item"><span class="info-label">Filename</span><span class="info-value">{{ image.original_filename }}</span></div>
+                    <div class="info-item"><span class="info-label">Size</span><span class="info-value">{{ image.file_size_display }}</span></div>
+                    <div class="info-item"><span class="info-label">Dimensions</span><span class="info-value">{{ image.dimensions_display }}</span></div>
+                    <div class="info-item"><span class="info-label">Type</span><span class="info-value">{{ image.mime_type }}</span></div>
+                    <div class="info-item"><span class="info-label">Uploaded</span><span class="info-value">{{ image.uploaded_at|date:"M d, Y H:i" }}</span></div>
+                    {% if image.verified_at %}
+                    <div class="info-item"><span class="info-label">Verified</span><span class="info-value">{{ image.verified_at|date:"M d, Y H:i" }}</span></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Verification History -->
+            {% if verifications %}
+            <div class="detail-section">
+                <h3>Verification History</h3>
+                <div class="verification-history">
+                    {% for v in verifications %}
+                    <div class="history-item">
+                        <span class="status-badge status-{{ v.status }} status-sm">{{ v.get_status_display }}</span>
+                        <span class="history-date">{{ v.requested_at|date:"M d, H:i" }}</span>
+                        {% if v.confidence_score is not None %}
+                        <span class="history-conf">{{ v.confidence_score|floatformat:1 }}%</span>
+                        {% endif %}
+                        {% if v.error_message %}
+                        <span class="history-error">{{ v.error_message }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="detail-actions">
+                {% if image.verification_status == 'pending' or image.verification_status == 'error' %}
+                <form method="post" action="{% url 'gallery:verify_image' image.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-block">🤖 Verify with AI</button>
+                </form>
+                {% else %}
+                <form method="post" action="{% url 'gallery:verify_image' image.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary btn-block">🔄 Re-verify</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{% url 'gallery:delete_image' image.id %}" onsubmit="return confirm('Delete this image permanently?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-block">🗑️ Delete Image</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
