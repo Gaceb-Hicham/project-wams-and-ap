@@ -34,7 +34,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'GalleryImage.middleware.JWTAuthMiddleware',
 ]
 
 ROOT_URLCONF = 'GalleryImage_Service.urls'
