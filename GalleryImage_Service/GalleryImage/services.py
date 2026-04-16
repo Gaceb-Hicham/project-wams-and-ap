@@ -1,3 +1,4 @@
+import os
 import requests
 import logging
 from django.conf import settings
@@ -90,11 +91,14 @@ class AIVerificationService:
     @classmethod
     def analyze_image(cls, image_file_path):
         """Send image to AI service. Returns result dict or None if unavailable."""
+        import mimetypes
         try:
+            mime_type = mimetypes.guess_type(image_file_path)[0] or 'image/jpeg'
+            filename = os.path.basename(image_file_path)
             with open(image_file_path, 'rb') as f:
                 resp = requests.post(
                     f"{cls._base_url()}/api/analyze/",
-                    files={'image': f},
+                    files={'image': (filename, f, mime_type)},
                     timeout=30,
                 )
             if resp.status_code == 200:

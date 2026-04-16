@@ -31,10 +31,14 @@ def analyze_image(request):
     if not image_file:
         return Response({'error': 'No image file provided. Send as "image" field.'}, status=400)
 
-    # Validate file type
+    # Validate file type — check content_type, fallback to filename extension
+    import mimetypes
     allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff']
-    if image_file.content_type not in allowed_types:
-        return Response({'error': f'Unsupported image type: {image_file.content_type}'}, status=400)
+    content_type = image_file.content_type
+    if not content_type or content_type == 'application/octet-stream':
+        content_type = mimetypes.guess_type(image_file.name)[0] or ''
+    if content_type not in allowed_types:
+        return Response({'error': f'Unsupported image type: {content_type}'}, status=400)
 
     try:
         start_time = time.time()
