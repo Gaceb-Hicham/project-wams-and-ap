@@ -25,6 +25,45 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ─── Custom Scrollbar (Global) ────────────────────────── */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b transparent;
+}
+
+/* Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Hide scrollbar arrows */
+*::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* Completely hide scrollbar on elements with .scrollbar-hide */
+.scrollbar-hide {
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @layer utilities {
   @keyframes scan {
     0% {
