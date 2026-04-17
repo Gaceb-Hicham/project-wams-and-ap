@@ -80,29 +80,8 @@ def image_list_api(request):
 
     HistoriqueService.log_action(uid, 'image_uploaded', {'image_id': image.id, 'title': title})
 
-    # Auto AI verification
-    ai_result = AIVerificationService.analyze_image(image.image_file.path)
-    if ai_result:
-        is_modified = ai_result.get('is_modified', False)
-        confidence = ai_result.get('confidence', 0.0)
-        image.verification_status = (
-            Image.VerificationStatus.EDITED if is_modified
-            else Image.VerificationStatus.UNEDITED
-        )
-        image.ai_confidence_score = confidence
-        image.ai_report = ai_result
-        image.verified_at = timezone.now()
-        image.save()
-        ImageVerification.objects.create(
-            image=image, status=image.verification_status,
-            confidence_score=confidence, ai_response=ai_result,
-            completed_at=timezone.now(),
-        )
-    else:
-        ImageVerification.objects.create(
-            image=image, status=Image.VerificationStatus.PENDING,
-            error_message='AI service unavailable at time of upload.',
-        )
+    # AI verification is now user-initiated (optional) — image stays pending
+    # Users can verify from the frontend via POST /gallery/api/images/{id}/verify/
 
     return Response(ImageSerializer(image, context={'request': request}).data, status=201)
 
