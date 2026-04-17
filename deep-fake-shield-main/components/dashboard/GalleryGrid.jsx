@@ -88,6 +88,7 @@ export default function GalleryGrid({ images, onImageDeleted }) {
               key={image.id}
               image={image}
               imageUrl={getImageUrl(image)}
+              fullUrl={getFullUrl(image)}
               isFavorite={isFav(image)}
               onToggleFav={() => handleToggleFav(image)}
               onExpand={() =>
@@ -119,8 +120,20 @@ const STATUS_CONFIG = {
   rejected: { label: "REJECTED", color: "bg-slate-500/20 text-slate-400" },
 };
 
-function MediaCard({ image, imageUrl, isFavorite, onToggleFav, onExpand, onDelete }) {
+function MediaCard({ image, imageUrl, fullUrl, isFavorite, onToggleFav, onExpand, onDelete }) {
+  const [showMenu, setShowMenu] = useState(false);
   const status = STATUS_CONFIG[image.verification_status] || STATUS_CONFIG.pending;
+
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    const link = document.createElement("a");
+    link.href = fullUrl || imageUrl;
+    link.download = image.original_filename || image.title || "image";
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div
@@ -158,15 +171,52 @@ function MediaCard({ image, imageUrl, isFavorite, onToggleFav, onExpand, onDelet
 
       {/* Selection Overlay */}
       <div className="absolute inset-0 bg-linear-to-t from-[#0b1326] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+        {/* Three Dots — Dropdown Menu */}
         <div className="absolute top-3 right-12">
           <button
             onClick={(e) => {
               e.stopPropagation();
+              setShowMenu((prev) => !prev);
             }}
             className="p-1.5 bg-[#0b1326]/60 backdrop-blur-md rounded-lg text-white hover:text-[#adc6ff] transition-colors"
           >
             <MoreVertical size={14} />
           </button>
+
+          {/* Dropdown */}
+          {showMenu && (
+            <div
+              className="absolute top-9 right-0 w-44 bg-[#131b2e] border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-30"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => { setShowMenu(false); onExpand(); }}
+                className="w-full px-4 py-3 text-left text-[11px] font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-2"
+              >
+                <Maximize2 size={12} /> View Details
+              </button>
+              <button
+                onClick={(e) => { setShowMenu(false); handleDownload(e); }}
+                className="w-full px-4 py-3 text-left text-[11px] font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-2"
+              >
+                <Download size={12} /> Download
+              </button>
+              <button
+                onClick={() => { setShowMenu(false); onToggleFav(); }}
+                className="w-full px-4 py-3 text-left text-[11px] font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-2"
+              >
+                <Heart size={12} fill={isFavorite ? "currentColor" : "none"} />
+                {isFavorite ? "Unfavorite" : "Favorite"}
+              </button>
+              <div className="border-t border-white/5" />
+              <button
+                onClick={() => { setShowMenu(false); onDelete(); }}
+                className="w-full px-4 py-3 text-left text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
@@ -180,7 +230,8 @@ function MediaCard({ image, imageUrl, isFavorite, onToggleFav, onExpand, onDelet
             <div className="flex gap-2">
               <button
                 className="text-slate-400 hover:text-white transition-colors"
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleDownload}
+                title="Download"
               >
                 <Download size={14} />
               </button>
@@ -190,6 +241,7 @@ function MediaCard({ image, imageUrl, isFavorite, onToggleFav, onExpand, onDelet
                   e.stopPropagation();
                   onDelete();
                 }}
+                title="Delete"
               >
                 <Trash2 size={14} />
               </button>
@@ -199,7 +251,7 @@ function MediaCard({ image, imageUrl, isFavorite, onToggleFav, onExpand, onDelet
       </div>
 
       {/* Center Icon Overlay */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         <div className="w-10 h-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center scale-75 group-hover:scale-100 transition-transform duration-500">
           <Maximize2 className="text-white" size={18} />
         </div>
