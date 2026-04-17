@@ -139,6 +139,14 @@ def image_verify_api(request, image_id):
         confidence_score=confidence, ai_response=ai_result,
         completed_at=timezone.now(),
     )
+
+    # Log verification to Historique service
+    HistoriqueService.log_action(
+        request.user_info['user_id'], 'image_verified',
+        {'image_id': image.id, 'title': image.title,
+         'status': image.verification_status, 'confidence': confidence}
+    )
+
     return Response(ImageSerializer(image, context={'request': request}).data)
 
 

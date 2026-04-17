@@ -129,3 +129,22 @@ export async function getStats() {
 export async function getHealth() {
   return apiFetch(GALLERY_URL, "/gallery/api/health/");
 }
+
+// ─── Historique API — Audit Logs ──────────────────────────────
+const HISTORIQUE_URL =
+  process.env.NEXT_PUBLIC_HISTORIQUE_URL || "http://localhost:8003";
+
+export async function getAuditLogs({ userId, action, limit = 50, offset = 0 } = {}) {
+  const params = new URLSearchParams();
+  if (userId) params.set("user_id", userId);
+  if (action) params.set("action", action);
+  params.set("limit", limit);
+  params.set("offset", offset);
+  const qs = params.toString();
+  return apiFetch(HISTORIQUE_URL, `/api/history/logs/?${qs}`);
+}
+
+export async function getAuditStats(userId) {
+  const qs = userId ? `?user_id=${userId}` : "";
+  return apiFetch(HISTORIQUE_URL, `/api/history/stats/${qs}`);
+}

@@ -138,6 +138,6 @@ class HistoriqueService:
     @classmethod
     def is_healthy(cls):
         try:
-            return requests.get(f"{cls._base_url()}/api/health/", timeout=0.5).status_code == 200
+            return requests.get(f"{cls._base_url()}/api/history/health/", timeout=0.5).status_code == 200
         except requests.exceptions.RequestException:
             return False
