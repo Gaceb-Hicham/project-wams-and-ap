@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Heart, Loader2, HeartOff } from "lucide-react";
-import { getFavorites, toggleFavorite } from "@/lib/api";
+import { getFavorites, toggleFavorite, deleteImage } from "@/lib/api";
+import ImagePreview from "@/components/dashboard/ImagePreview";
 
 const GALLERY_URL =
   process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
@@ -11,6 +12,7 @@ export default function FavoritesPage() {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(null);
+  const [activeImage, setActiveImage] = useState(null);
 
   useEffect(() => {
     loadFavorites();
@@ -37,8 +39,24 @@ export default function FavoritesPage() {
     setToggling(null);
   };
 
+  const handleDeleteImage = async (id) => {
+    if (!window.confirm("Delete this image permanently?")) return;
+    try {
+      await deleteImage(id);
+      setActiveImage(null);
+      setFavorites((prev) => prev.filter((img) => img.id !== id));
+    } catch {
+      alert("Failed to delete image.");
+    }
+  };
+
   const getImageUrl = (img) => {
     const url = img?.thumbnail_url || img?.image_url || "";
+    return url.startsWith("http") ? url : `${GALLERY_URL}${url}`;
+  };
+
+  const getFullUrl = (img) => {
+    const url = img?.image_url || "";
     return url.startsWith("http") ? url : `${GALLERY_URL}${url}`;
   };
 
@@ -87,7 +105,8 @@ export default function FavoritesPage() {
           {favorites.map((img) => (
             <div
               key={img.id}
-              className="group relative bg-[#131b2e] rounded-2xl overflow-hidden border border-white/5 hover:border-red-400/20 hover:-translate-y-1 transition-all duration-300 h-56"
+              className="group relative bg-[#131b2e] rounded-2xl overflow-hidden border border-white/5 hover:border-red-400/20 hover:-translate-y-1 transition-all duration-300 h-56 cursor-pointer"
+              onClick={() => setActiveImage({ ...img, fullUrl: getFullUrl(img) })}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -98,7 +117,7 @@ export default function FavoritesPage() {
 
               {/* Unfavorite button */}
               <button
-                onClick={() => handleUnfavorite(img.id)}
+                onClick={(e) => { e.stopPropagation(); handleUnfavorite(img.id); }}
                 disabled={toggling === img.id}
                 className="absolute top-3 right-3 p-2 bg-black/50 backdrop-blur-sm rounded-full text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
                 title="Remove from favorites"
@@ -142,6 +161,17 @@ export default function FavoritesPage() {
           ))}
         </div>
       )}
+
+      <ImagePreview
+        activeImage={activeImage}
+        onClose={() => setActiveImage(null)}
+        onDelete={(id) => handleDeleteImage(id)}
+        onFavoriteChanged={(id, newState) => {
+          if (!newState) {
+            setFavorites((prev) => prev.filter((img) => img.id !== id));
+          }
+        }}
+      />
     </div>
   );
 }

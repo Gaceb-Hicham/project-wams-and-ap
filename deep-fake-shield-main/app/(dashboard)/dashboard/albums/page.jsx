@@ -11,6 +11,7 @@ import {
   X,
   ArrowLeft,
 } from "lucide-react";
+import ImagePreview from "@/components/dashboard/ImagePreview";
 import {
   getAlbums,
   createAlbum,
@@ -19,6 +20,7 @@ import {
   getImages,
   addImagesToAlbum,
   removeImagesFromAlbum,
+  deleteImage,
 } from "@/lib/api";
 
 const GALLERY_URL =
@@ -40,6 +42,9 @@ export default function AlbumsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [allImages, setAllImages] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // Image preview modal
+  const [activeImage, setActiveImage] = useState(null);
 
   useEffect(() => {
     loadAlbums();
@@ -130,6 +135,22 @@ export default function AlbumsPage() {
     return url.startsWith("http") ? url : `${GALLERY_URL}${url}`;
   };
 
+  const getFullUrl = (img) => {
+    const url = img?.image_url || "";
+    return url.startsWith("http") ? url : `${GALLERY_URL}${url}`;
+  };
+
+  const handleDeleteImage = async (id) => {
+    if (!window.confirm("Delete this image permanently?")) return;
+    try {
+      await deleteImage(id);
+      setActiveImage(null);
+      setAlbumImages((prev) => prev.filter((i) => i.id !== id));
+    } catch {
+      alert("Failed to delete image.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -197,7 +218,8 @@ export default function AlbumsPage() {
             {albumImages.map((img) => (
               <div
                 key={img.id}
-                className="relative group rounded-2xl overflow-hidden border border-white/5 h-48 hover:border-[#adc6ff]/20 transition-all"
+                className="relative group rounded-2xl overflow-hidden border border-white/5 h-48 hover:border-[#adc6ff]/20 transition-all cursor-pointer"
+                onClick={() => setActiveImage({ ...img, fullUrl: getFullUrl(img) })}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -206,7 +228,7 @@ export default function AlbumsPage() {
                   className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                 />
                 <button
-                  onClick={() => handleRemoveImage(img.id)}
+                  onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }}
                   className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-all"
                   title="Remove from album"
                 >
@@ -300,6 +322,11 @@ export default function AlbumsPage() {
             </div>
           </div>
         )}
+        <ImagePreview
+          activeImage={activeImage}
+          onClose={() => setActiveImage(null)}
+          onDelete={(id) => handleDeleteImage(id)}
+        />
       </div>
     );
   }

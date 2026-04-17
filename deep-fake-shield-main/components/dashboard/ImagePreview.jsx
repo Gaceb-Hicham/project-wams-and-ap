@@ -2,20 +2,23 @@
 
 import { useEffect, useState } from "react";
 
-import { X, Download, Trash2, Maximize, Share2, ShieldCheck, Loader2 } from "lucide-react";
-import { verifyImage } from "@/lib/api";
+import { X, Download, Trash2, Maximize, Share2, ShieldCheck, Loader2, Heart } from "lucide-react";
+import { verifyImage, toggleFavorite } from "@/lib/api";
 
 const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
 
-export default function ImagePreview({ activeImage, onClose, onDelete }) {
+export default function ImagePreview({ activeImage, onClose, onDelete, onFavoriteChanged }) {
   const [verifying, setVerifying] = useState(false);
   const [imageData, setImageData] = useState(null);
+  const [isFav, setIsFav] = useState(false);
+  const [togglingFav, setTogglingFav] = useState(false);
 
   // Lock scroll when modal is open
   useEffect(() => {
     if (activeImage) {
       document.body.style.overflow = "hidden";
       setImageData(activeImage);
+      setIsFav(activeImage.is_favorite || false);
     } else {
       document.body.style.overflow = "unset";
       setImageData(null);
@@ -55,6 +58,19 @@ export default function ImagePreview({ activeImage, onClose, onDelete }) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleToggleFav = async () => {
+    setTogglingFav(true);
+    const newState = !isFav;
+    setIsFav(newState);
+    try {
+      await toggleFavorite(imageData.id);
+      onFavoriteChanged?.(imageData.id, newState);
+    } catch {
+      setIsFav(!newState);
+    }
+    setTogglingFav(false);
   };
 
   const statusDisplay = {
@@ -107,12 +123,27 @@ export default function ImagePreview({ activeImage, onClose, onDelete }) {
                 {st.label}
               </span>
             </div>
-            <button
-              onClick={onClose}
-              className="hidden md:flex p-2 text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Favorite Button in Header */}
+              <button
+                onClick={handleToggleFav}
+                disabled={togglingFav}
+                className={`p-2 rounded-xl transition-all ${
+                  isFav
+                    ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                    : "text-slate-500 hover:text-red-400 hover:bg-white/5"
+                }`}
+                title={isFav ? "Remove from favorites" : "Add to favorites"}
+              >
+                <Heart size={18} fill={isFav ? "currentColor" : "none"} />
+              </button>
+              <button
+                onClick={onClose}
+                className="hidden md:flex p-2 text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Metadata Body */}
@@ -148,6 +179,32 @@ export default function ImagePreview({ activeImage, onClose, onDelete }) {
                     {Number(imageData.ai_confidence_score).toFixed(1)}%
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* Tags */}
+            {imageData.tags?.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Tags</p>
+                <div className="flex flex-wrap gap-2">
+                  {imageData.tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="text-[9px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider"
+                      style={{ backgroundColor: `${tag.color}15`, color: tag.color }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Album */}
+            {imageData.album_title && (
+              <div className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Album</p>
+                <p className="text-xs text-[#adc6ff] font-bold">📁 {imageData.album_title}</p>
               </div>
             )}
 
@@ -213,17 +270,6 @@ export default function ImagePreview({ activeImage, onClose, onDelete }) {
                 })}
               </div>
             )}
-
-            {/* Action Group */}
-            <div className="space-y-3">
-              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">
-                Available Operations
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <ActionButton icon={<Share2 size={14} />} label="Share" />
-                <ActionButton icon={<Maximize size={14} />} label="Full Res" />
-              </div>
-            </div>
           </div>
 
           {/* Fixed Footer Actions */}
@@ -279,14 +325,5 @@ function InfoCard({ label, value }) {
       </p>
       <p className="text-xs text-white font-mono truncate">{value}</p>
     </div>
-  );
-}
-
-function ActionButton({ icon, label }) {
-  return (
-    <button className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/5 text-white/70 text-[10px] font-bold uppercase border border-white/5 hover:bg-white/10 transition-all">
-      {icon}
-      {label}
-    </button>
   );
 }

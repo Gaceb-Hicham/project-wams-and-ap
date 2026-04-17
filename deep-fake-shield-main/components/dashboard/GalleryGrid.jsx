@@ -103,6 +103,9 @@ export default function GalleryGrid({ images, onImageDeleted }) {
         activeImage={activeImage}
         onClose={() => setActiveImage(null)}
         onDelete={(id) => handleDelete(id)}
+        onFavoriteChanged={(id, newState) => {
+          setFavStates((prev) => ({ ...prev, [id]: newState }));
+        }}
       />
     </>
   );
