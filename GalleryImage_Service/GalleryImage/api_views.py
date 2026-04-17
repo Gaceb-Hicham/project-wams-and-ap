@@ -195,6 +195,7 @@ def health_api(request):
         'status': 'healthy',
         'service': 'GalleryImage_Service',
         'services': {
+            'gallery': True,  # If this endpoint responds, Gallery is healthy
             'auth': auth_future.result(),
             'ai': ai_future.result(),
             'historique': hist_future.result(),

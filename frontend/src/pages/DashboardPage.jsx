@@ -26,7 +26,7 @@ export default function DashboardPage() {
         const res = await getHealth();
         setHealth(res.data.services);
       } catch (e) {
-        setHealth({ auth: false, ai: false, historique: false });
+        setHealth(false);  // Gallery is down — can't determine other services
       }
     };
 
@@ -50,9 +50,17 @@ export default function DashboardPage() {
         <div className="health-indicators">
           {health ? (
             <>
+              <span className={`health-dot ${health.gallery ? 'healthy' : 'unhealthy'}`}>Gallery Service</span>
               <span className={`health-dot ${health.auth ? 'healthy' : 'unhealthy'}`}>Auth Service</span>
               <span className={`health-dot ${health.ai ? 'healthy' : 'unhealthy'}`}>AI Service</span>
               <span className={`health-dot ${health.historique ? 'healthy' : 'unhealthy'}`}>History Service</span>
+            </>
+          ) : health === false ? (
+            <>
+              <span className="health-dot unhealthy">Gallery Service</span>
+              <span className="health-dot unknown">Auth Service</span>
+              <span className="health-dot unknown">AI Service</span>
+              <span className="health-dot unknown">History Service</span>
             </>
           ) : (
             <span className="health-loading">Checking services...</span>
