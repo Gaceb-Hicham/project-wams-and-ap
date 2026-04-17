@@ -2,14 +2,28 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Download, Maximize2, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { Download, Maximize2, MoreVertical, Plus, Trash2, Heart } from "lucide-react";
 import ImagePreview from "./ImagePreview";
-import { deleteImage } from "@/lib/api";
+import { deleteImage, toggleFavorite } from "@/lib/api";
 
 const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
 
 export default function GalleryGrid({ images, onImageDeleted }) {
   const [activeImage, setActiveImage] = useState(null);
+  const [favStates, setFavStates] = useState({});
+
+  // Track local favorite overrides
+  const isFav = (img) => favStates[img.id] !== undefined ? favStates[img.id] : img.is_favorite;
+
+  const handleToggleFav = async (img) => {
+    const newState = !isFav(img);
+    setFavStates((prev) => ({ ...prev, [img.id]: newState }));
+    try {
+      await toggleFavorite(img.id);
+    } catch {
+      setFavStates((prev) => ({ ...prev, [img.id]: !newState }));
+    }
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this image permanently?")) return;
@@ -74,6 +88,8 @@ export default function GalleryGrid({ images, onImageDeleted }) {
               key={image.id}
               image={image}
               imageUrl={getImageUrl(image)}
+              isFavorite={isFav(image)}
+              onToggleFav={() => handleToggleFav(image)}
               onExpand={() =>
                 setActiveImage({ ...image, fullUrl: getFullUrl(image) })
               }
@@ -100,7 +116,7 @@ const STATUS_CONFIG = {
   rejected: { label: "REJECTED", color: "bg-slate-500/20 text-slate-400" },
 };
 
-function MediaCard({ image, imageUrl, onExpand, onDelete }) {
+function MediaCard({ image, imageUrl, isFavorite, onToggleFav, onExpand, onDelete }) {
   const status = STATUS_CONFIG[image.verification_status] || STATUS_CONFIG.pending;
 
   return (
@@ -125,9 +141,21 @@ function MediaCard({ image, imageUrl, onExpand, onDelete }) {
         </span>
       </div>
 
+      {/* Favorite Button */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleFav(); }}
+        className={`absolute top-3 right-3 p-1.5 rounded-full backdrop-blur-md transition-all z-10 ${
+          isFavorite
+            ? "bg-red-500/20 text-red-400"
+            : "bg-[#0b1326]/60 text-slate-500 opacity-0 group-hover:opacity-100 hover:text-red-400"
+        }`}
+      >
+        <Heart size={14} fill={isFavorite ? "currentColor" : "none"} />
+      </button>
+
       {/* Selection Overlay */}
       <div className="absolute inset-0 bg-linear-to-t from-[#0b1326] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-12">
           <button
             onClick={(e) => {
               e.stopPropagation();

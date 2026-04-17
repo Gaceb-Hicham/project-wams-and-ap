@@ -5,8 +5,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 
-from .models import Image, ImageVerification
-from .serializers import ImageSerializer, ImageUploadSerializer, VerificationSerializer
+from .models import Image, Album, Tag, ImageVerification
+from .serializers import (
+    ImageSerializer, ImageUploadSerializer, VerificationSerializer,
+    AlbumSerializer, TagSerializer,
+)
 from .services import AuthService, AIVerificationService, HistoriqueService
 from .utils import validate_image_file, generate_thumbnail, get_image_dimensions
 
@@ -76,6 +79,16 @@ def image_list_api(request):
     )
     if thumbnail:
         image.thumbnail = thumbnail
+
+    # Assign to album if provided
+    album_id = ser.validated_data.get('album_id')
+    if album_id:
+        try:
+            album = Album.objects.get(id=album_id, user_id=uid)
+            image.album = album
+        except Album.DoesNotExist:
+            pass
+
     image.save()
 
     HistoriqueService.log_action(uid, 'image_uploaded', {'image_id': image.id, 'title': title})
@@ -189,3 +202,183 @@ def health_api(request):
         }
     })
 
+
+# ─── Albums API ───────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+@require_auth
+def album_list_api(request):
+    """GET: list user albums. POST: create a new album."""
+    uid = request.user_info['user_id']
+
+    if request.method == 'GET':
+        albums = Album.objects.filter(user_id=uid)
+        return Response(AlbumSerializer(albums, many=True, context={'request': request}).data)
+
+    # POST — create album
+    title = request.data.get('title', '').strip()
+    if not title:
+        return Response({'error': 'Album title is required.'}, status=400)
+
+    album = Album.objects.create(
+        title=title,
+        description=request.data.get('description', ''),
+        user_id=uid,
+        user_username=request.user_info['username'],
+    )
+    return Response(AlbumSerializer(album, context={'request': request}).data, status=201)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+@require_auth
+def album_detail_api(request, album_id):
+    """GET: album detail with images. PUT: update album. DELETE: delete album."""
+    uid = request.user_info['user_id']
+    try:
+        album = Album.objects.get(id=album_id, user_id=uid)
+    except Album.DoesNotExist:
+        return Response({'error': 'Album not found.'}, status=404)
+
+    if request.method == 'GET':
+        data = AlbumSerializer(album, context={'request': request}).data
+        images = Image.objects.filter(album=album, user_id=uid)
+        data['images'] = ImageSerializer(images, many=True, context={'request': request}).data
+        return Response(data)
+
+    if request.method == 'PUT':
+        if 'title' in request.data:
+            album.title = request.data['title'].strip()
+        if 'description' in request.data:
+            album.description = request.data['description']
+        if 'cover_image_id' in request.data:
+            cover_id = request.data['cover_image_id']
+            if cover_id:
+                try:
+                    album.cover_image = Image.objects.get(id=cover_id, user_id=uid)
+                except Image.DoesNotExist:
+                    pass
+            else:
+                album.cover_image = None
+        album.save()
+        return Response(AlbumSerializer(album, context={'request': request}).data)
+
+    # DELETE
+    album.delete()
+    return Response({'status': 'deleted'}, status=204)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([AllowAny])
+@require_auth
+def album_images_api(request, album_id):
+    """POST: add images to album. DELETE: remove images from album."""
+    uid = request.user_info['user_id']
+    try:
+        album = Album.objects.get(id=album_id, user_id=uid)
+    except Album.DoesNotExist:
+        return Response({'error': 'Album not found.'}, status=404)
+
+    image_ids = request.data.get('image_ids', [])
+    if not image_ids:
+        return Response({'error': 'image_ids is required.'}, status=400)
+
+    images = Image.objects.filter(id__in=image_ids, user_id=uid)
+
+    if request.method == 'POST':
+        images.update(album=album)
+        return Response({'status': 'added', 'count': images.count()})
+
+    # DELETE — remove from album (set album to null)
+    images.update(album=None)
+    return Response({'status': 'removed', 'count': images.count()})
+
+
+# ─── Tags API ─────────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+@require_auth
+def tag_list_api(request):
+    """GET: list user tags. POST: create a new tag."""
+    uid = request.user_info['user_id']
+
+    if request.method == 'GET':
+        tags = Tag.objects.filter(user_id=uid)
+        return Response(TagSerializer(tags, many=True).data)
+
+    # POST — create tag
+    name = request.data.get('name', '').strip().lower()
+    if not name:
+        return Response({'error': 'Tag name is required.'}, status=400)
+
+    color = request.data.get('color', '#adc6ff')
+    tag, created = Tag.objects.get_or_create(
+        name=name, user_id=uid,
+        defaults={'color': color},
+    )
+    return Response(TagSerializer(tag).data, status=201 if created else 200)
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+@require_auth
+def tag_detail_api(request, tag_id):
+    """DELETE a tag."""
+    try:
+        tag = Tag.objects.get(id=tag_id, user_id=request.user_info['user_id'])
+    except Tag.DoesNotExist:
+        return Response({'error': 'Tag not found.'}, status=404)
+    tag.delete()
+    return Response({'status': 'deleted'}, status=204)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([AllowAny])
+@require_auth
+def image_tags_api(request, image_id):
+    """POST: add tags to image. DELETE: remove tags from image."""
+    uid = request.user_info['user_id']
+    try:
+        image = Image.objects.get(id=image_id, user_id=uid)
+    except Image.DoesNotExist:
+        return Response({'error': 'Image not found.'}, status=404)
+
+    tag_ids = request.data.get('tag_ids', [])
+    tags = Tag.objects.filter(id__in=tag_ids, user_id=uid)
+
+    if request.method == 'POST':
+        image.tags.add(*tags)
+    else:
+        image.tags.remove(*tags)
+
+    return Response(ImageSerializer(image, context={'request': request}).data)
+
+
+# ─── Favorites API ────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@require_auth
+def toggle_favorite_api(request, image_id):
+    """Toggle favorite status for an image."""
+    uid = request.user_info['user_id']
+    try:
+        image = Image.objects.get(id=image_id, user_id=uid)
+    except Image.DoesNotExist:
+        return Response({'error': 'Image not found.'}, status=404)
+
+    image.is_favorite = not image.is_favorite
+    image.save(update_fields=['is_favorite', 'updated_at'])
+    return Response({'id': image.id, 'is_favorite': image.is_favorite})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@require_auth
+def favorites_list_api(request):
+    """GET: list all favorite images for current user."""
+    uid = request.user_info['user_id']
+    images = Image.objects.filter(user_id=uid, is_favorite=True)
+    return Response(ImageSerializer(images, many=True, context={'request': request}).data)

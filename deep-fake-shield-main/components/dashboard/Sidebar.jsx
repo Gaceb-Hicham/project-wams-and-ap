@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Image as image_icon, TestTube2, History, Plus, LogOut } from "lucide-react";
+import { Image as image_icon, TestTube2, History, Plus, LogOut, FolderOpen, Heart } from "lucide-react";
 import { clearSession } from "@/lib/api";
 
 function Sidebar({ user }) {
@@ -11,6 +11,8 @@ function Sidebar({ user }) {
 
   const navItems = [
     { name: "Gallery", href: "/dashboard", icon: image_icon },
+    { name: "Albums", href: "/dashboard/albums", icon: FolderOpen },
+    { name: "Favorites", href: "/dashboard/favorites", icon: Heart },
     { name: "Analyze", href: "/dashboard/analyze", icon: TestTube2 },
     { name: "History", href: "/dashboard/history", icon: History },
   ];

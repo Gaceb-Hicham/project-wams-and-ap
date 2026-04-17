@@ -8,11 +8,16 @@ class Album(models.Model):
     description = models.TextField(blank=True, default='')
     user_id = models.IntegerField(db_index=True)
     user_username = models.CharField(max_length=150, default='anonymous')
+    cover_image = models.ForeignKey(
+        'Image', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='cover_of_albums',
+        help_text='Image used as album cover',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-updated_at']
 
     def __str__(self):
         return self.title
@@ -20,6 +25,24 @@ class Album(models.Model):
     @property
     def image_count(self):
         return self.images.count()
+
+
+class Tag(models.Model):
+    """Tags for categorizing images (e.g., 'nature', 'portrait', 'document')."""
+    name = models.CharField(max_length=100)
+    user_id = models.IntegerField(db_index=True)
+    color = models.CharField(
+        max_length=7, default='#adc6ff',
+        help_text='Hex color for display (e.g., #adc6ff)',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ['name', 'user_id']
+
+    def __str__(self):
+        return self.name
 
 
 class Image(models.Model):
@@ -48,6 +71,12 @@ class Image(models.Model):
         null=True, blank=True, related_name='images'
     )
 
+    # Tags (many-to-many)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='images')
+
+    # Favorites
+    is_favorite = models.BooleanField(default=False, db_index=True)
+
     # Verification
     verification_status = models.CharField(
         max_length=20,
@@ -74,6 +103,7 @@ class Image(models.Model):
         ordering = ['-uploaded_at']
         indexes = [
             models.Index(fields=['user_id', 'verification_status']),
+            models.Index(fields=['user_id', 'is_favorite']),
         ]
 
     def __str__(self):

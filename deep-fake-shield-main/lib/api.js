@@ -130,6 +130,92 @@ export async function verifyImage(id) {
   });
 }
 
+// ─── Albums API ───────────────────────────────────────────────
+export async function getAlbums() {
+  return apiFetch(GALLERY_URL, "/gallery/api/albums/");
+}
+
+export async function createAlbum(title, description = "") {
+  return apiFetch(GALLERY_URL, "/gallery/api/albums/", {
+    method: "POST",
+    body: JSON.stringify({ title, description }),
+  });
+}
+
+export async function getAlbumDetail(albumId) {
+  return apiFetch(GALLERY_URL, `/gallery/api/albums/${albumId}/`);
+}
+
+export async function updateAlbum(albumId, data) {
+  return apiFetch(GALLERY_URL, `/gallery/api/albums/${albumId}/`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAlbum(albumId) {
+  return apiFetch(GALLERY_URL, `/gallery/api/albums/${albumId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function addImagesToAlbum(albumId, imageIds) {
+  return apiFetch(GALLERY_URL, `/gallery/api/albums/${albumId}/images/`, {
+    method: "POST",
+    body: JSON.stringify({ image_ids: imageIds }),
+  });
+}
+
+export async function removeImagesFromAlbum(albumId, imageIds) {
+  return apiFetch(GALLERY_URL, `/gallery/api/albums/${albumId}/images/`, {
+    method: "DELETE",
+    body: JSON.stringify({ image_ids: imageIds }),
+  });
+}
+
+// ─── Tags API ─────────────────────────────────────────────────
+export async function getTags() {
+  return apiFetch(GALLERY_URL, "/gallery/api/tags/");
+}
+
+export async function createTag(name, color = "#adc6ff") {
+  return apiFetch(GALLERY_URL, "/gallery/api/tags/", {
+    method: "POST",
+    body: JSON.stringify({ name, color }),
+  });
+}
+
+export async function deleteTag(tagId) {
+  return apiFetch(GALLERY_URL, `/gallery/api/tags/${tagId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function addTagsToImage(imageId, tagIds) {
+  return apiFetch(GALLERY_URL, `/gallery/api/images/${imageId}/tags/`, {
+    method: "POST",
+    body: JSON.stringify({ tag_ids: tagIds }),
+  });
+}
+
+export async function removeTagsFromImage(imageId, tagIds) {
+  return apiFetch(GALLERY_URL, `/gallery/api/images/${imageId}/tags/`, {
+    method: "DELETE",
+    body: JSON.stringify({ tag_ids: tagIds }),
+  });
+}
+
+// ─── Favorites API ────────────────────────────────────────────
+export async function toggleFavorite(imageId) {
+  return apiFetch(GALLERY_URL, `/gallery/api/images/${imageId}/favorite/`, {
+    method: "POST",
+  });
+}
+
+export async function getFavorites() {
+  return apiFetch(GALLERY_URL, "/gallery/api/favorites/");
+}
+
 // ─── Gallery API — Stats ─────────────────────────────────────
 export async function getStats() {
   return apiFetch(GALLERY_URL, "/gallery/api/stats/");
