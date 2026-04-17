@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import UploadZone from "@/components/dashboard/Analyze/UploadZone";
-import { getImages, verifyImage, quickScanImage } from "@/lib/api";
+import { getImages, verifyImage, quickScanImage, uploadImage } from "@/lib/api";
 
 const GALLERY_URL =
   process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
@@ -31,6 +31,8 @@ export default function AnalyzePage() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const scanInputRef = useRef(null);
+  const [savingToGallery, setSavingToGallery] = useState(false);
+  const [savedToGallery, setSavedToGallery] = useState(false);
 
   // Active mode: "upload" (save to gallery) or "quickscan" (direct AI, no save)
   const [mode, setMode] = useState("upload");
@@ -110,7 +112,26 @@ export default function AnalyzePage() {
     setScanFile(null);
     setScanPreview(null);
     setScanResult(null);
+    setSavedToGallery(false);
     if (scanInputRef.current) scanInputRef.current.value = "";
+  };
+
+  const handleSaveToGallery = async () => {
+    if (!scanFile || savedToGallery) return;
+    setSavingToGallery(true);
+    try {
+      const fd = new FormData();
+      fd.append("image_file", scanFile);
+      fd.append("title", scanFile.name.replace(/\.[^/.]+$/, ""));
+      fd.append("description", `Quick Scan result: ${scanResult?.is_modified ? "Modified" : "Authentic"} (${Number(scanResult?.confidence || 0).toFixed(1)}% confidence)`);
+      const saved = await uploadImage(fd);
+      setSavedToGallery(true);
+      // Also add to recent images list
+      setRecentImages((prev) => [saved, ...prev.slice(0, 3)]);
+    } catch (err) {
+      alert("Could not save to Gallery — the Gallery service may be offline.");
+    }
+    setSavingToGallery(false);
   };
 
   const getImageUrl = (img) => {
@@ -405,12 +426,40 @@ export default function AnalyzePage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={resetScan}
-                      className="w-full py-3 bg-[#222a3d] text-white font-bold uppercase tracking-widest rounded-xl text-xs hover:bg-[#2d3449] transition-colors"
-                    >
-                      Scan Another Image
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleSaveToGallery}
+                        disabled={savingToGallery || savedToGallery}
+                        className={`flex-1 py-3 font-bold uppercase tracking-widest rounded-xl text-xs flex items-center justify-center gap-2 transition-all ${
+                          savedToGallery
+                            ? "bg-[#4edea3]/10 text-[#4edea3] cursor-default"
+                            : "bg-[#adc6ff]/10 text-[#adc6ff] hover:bg-[#adc6ff]/20"
+                        } disabled:opacity-50`}
+                      >
+                        {savedToGallery ? (
+                          <>
+                            <CheckCircle2 size={14} />
+                            Saved to Gallery
+                          </>
+                        ) : savingToGallery ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} />
+                            Save to Gallery
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={resetScan}
+                        className="flex-1 py-3 bg-[#222a3d] text-white font-bold uppercase tracking-widest rounded-xl text-xs hover:bg-[#2d3449] transition-colors"
+                      >
+                        Scan Another
+                      </button>
+                    </div>
                   </div>
                 )}
 
