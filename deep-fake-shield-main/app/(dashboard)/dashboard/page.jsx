@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Search, Filter, Image as ImageIcon, Activity, Loader2 } from "lucide-react";
 import GalleryGrid from "@/components/dashboard/GalleryGrid";
-import { getImages, getStats, getHealth } from "@/lib/api";
+import { getImages, getStats, checkAllServicesHealth } from "@/lib/api";
 
 export default function GalleryPage() {
   const [images, setImages] = useState([]);
@@ -34,10 +34,10 @@ export default function GalleryPage() {
 
   const loadHealth = async () => {
     try {
-      const data = await getHealth();
-      setHealth(data.services);
+      const data = await checkAllServicesHealth();
+      setHealth(data);
     } catch {
-      setHealth(false);
+      setHealth({ auth: false, gallery: false, ai: false, historique: false });
     }
   };
 
@@ -91,17 +91,10 @@ export default function GalleryPage() {
         <div className="flex flex-wrap gap-5">
           {health ? (
             <>
-              <HealthDot label="Gallery Service" healthy={health.gallery} />
               <HealthDot label="Auth Service" healthy={health.auth} />
+              <HealthDot label="Gallery Service" healthy={health.gallery} />
               <HealthDot label="AI Service" healthy={health.ai} />
               <HealthDot label="History Service" healthy={health.historique} />
-            </>
-          ) : health === false ? (
-            <>
-              <HealthDot label="Gallery Service" healthy={false} />
-              <HealthDot label="Auth Service" unknown />
-              <HealthDot label="AI Service" unknown />
-              <HealthDot label="History Service" unknown />
             </>
           ) : (
             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">

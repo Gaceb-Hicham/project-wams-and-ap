@@ -1,9 +1,14 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  *  Verifai — Centralized API Layer
- *  Connects to Django microservices:
- *    • Auth Service  → localhost:8000
- *    • Gallery Service → localhost:8001
+ *  Connects DIRECTLY to each Django microservice:
+ *    • Auth Service       → localhost:8000
+ *    • Gallery Service    → localhost:8001
+ *    • AI Service         → localhost:8002
+ *    • Historique Service → localhost:8003
+ *
+ *  Each service is called independently for true microservice
+ *  fault tolerance — no single point of failure.
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -11,6 +16,10 @@ const AUTH_URL =
   process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:8000";
 const GALLERY_URL =
   process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+const AI_URL =
+  process.env.NEXT_PUBLIC_AI_URL || "http://localhost:8002";
+const HISTORIQUE_URL =
+  process.env.NEXT_PUBLIC_HISTORIQUE_URL || "http://localhost:8003";
 
 // ─── Token helpers ────────────────────────────────────────────
 export function getToken() {
@@ -121,19 +130,34 @@ export async function verifyImage(id) {
   });
 }
 
-// ─── Gallery API — Stats & Health ─────────────────────────────
+// ─── Gallery API — Stats ─────────────────────────────────────
 export async function getStats() {
   return apiFetch(GALLERY_URL, "/gallery/api/stats/");
 }
 
-export async function getHealth() {
-  return apiFetch(GALLERY_URL, "/gallery/api/health/");
+// ─── AI Service — Direct Access (Independent of Gallery) ──────
+/**
+ * Quick Scan — Send an image DIRECTLY to the AI service for
+ * instant analysis WITHOUT uploading to Gallery.
+ * Works even if Gallery is down.
+ */
+export async function quickScanImage(file) {
+  const fd = new FormData();
+  fd.append("image", file);
+  return apiFetch(AI_URL, "/api/analyze/", {
+    method: "POST",
+    body: fd,
+  });
 }
 
-// ─── Historique API — Audit Logs ──────────────────────────────
-const HISTORIQUE_URL =
-  process.env.NEXT_PUBLIC_HISTORIQUE_URL || "http://localhost:8003";
+/**
+ * Get AI model status (loaded model, capabilities, etc.)
+ */
+export async function getAIStatus() {
+  return apiFetch(AI_URL, "/api/status/");
+}
 
+// ─── Historique API — Audit Logs (Independent of Gallery) ─────
 export async function getAuditLogs({ userId, action, limit = 50, offset = 0 } = {}) {
   const params = new URLSearchParams();
   if (userId) params.set("user_id", userId);
@@ -147,4 +171,30 @@ export async function getAuditLogs({ userId, action, limit = 50, offset = 0 } = 
 export async function getAuditStats(userId) {
   const qs = userId ? `?user_id=${userId}` : "";
   return apiFetch(HISTORIQUE_URL, `/api/history/stats/${qs}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Independent Health Checks — Each service checked DIRECTLY.
+//  No single point of failure. If Gallery is down, you can still
+//  see that Auth, AI, and Historique are healthy.
+// ═══════════════════════════════════════════════════════════════
+
+async function checkHealth(url, path) {
+  try {
+    const res = await fetch(`${url}${path}`, { signal: AbortSignal.timeout(3000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function checkAllServicesHealth() {
+  const [auth, gallery, ai, historique] = await Promise.all([
+    checkHealth(AUTH_URL, "/api/auth/health/"),
+    checkHealth(GALLERY_URL, "/gallery/api/health/"),
+    checkHealth(AI_URL, "/api/health/"),
+    checkHealth(HISTORIQUE_URL, "/api/history/health/"),
+  ]);
+
+  return { auth, gallery, ai, historique };
 }

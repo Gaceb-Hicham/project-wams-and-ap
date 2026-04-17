@@ -1,17 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
-import { BarChart3, FileDown, Dna, Zap, ShieldCheck, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  BarChart3,
+  Dna,
+  Zap,
+  ShieldCheck,
+  Loader2,
+  CloudUpload,
+  ScanSearch,
+  Upload,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 import UploadZone from "@/components/dashboard/Analyze/UploadZone";
-import { getImages, verifyImage } from "@/lib/api";
+import { getImages, verifyImage, quickScanImage } from "@/lib/api";
 
-const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+const GALLERY_URL =
+  process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
 
 export default function AnalyzePage() {
   const [latestResult, setLatestResult] = useState(null);
   const [recentImages, setRecentImages] = useState([]);
-  const [verifying, setVerifying] = useState(null); // ID of image currently being verified
+  const [verifying, setVerifying] = useState(null);
+
+  // Quick Scan state
+  const [scanFile, setScanFile] = useState(null);
+  const [scanPreview, setScanPreview] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const scanInputRef = useRef(null);
+
+  // Active mode: "upload" (save to gallery) or "quickscan" (direct AI, no save)
+  const [mode, setMode] = useState("upload");
 
   useEffect(() => {
     loadRecentImages();
@@ -20,21 +42,18 @@ export default function AnalyzePage() {
   const loadRecentImages = async () => {
     try {
       const data = await getImages();
-      // Sort by most recent — take last 4
       const sorted = [...data].sort(
         (a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at)
       );
       setRecentImages(sorted.slice(0, 4));
 
-      // If the most recent image has been verified, show it as the latest result
       const lastVerified = sorted.find(
         (img) => img.verification_status !== "pending"
       );
-      if (lastVerified) {
-        setLatestResult(lastVerified);
-      }
+      if (lastVerified) setLatestResult(lastVerified);
     } catch {
-      console.error("Failed to load recent images");
+      // Gallery might be down — Quick Scan still works
+      console.warn("Gallery unavailable — Quick Scan mode is still available.");
     }
   };
 
@@ -54,6 +73,44 @@ export default function AnalyzePage() {
       alert("AI service unavailable. Please try again later.");
     }
     setVerifying(null);
+  };
+
+  // ─── Quick Scan ─────────────────────────────────────────────
+  const handleScanFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanFile(file);
+    setScanPreview(URL.createObjectURL(file));
+    setScanResult(null);
+  };
+
+  const handleScanDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    setScanFile(file);
+    setScanPreview(URL.createObjectURL(file));
+    setScanResult(null);
+  };
+
+  const handleQuickScan = async () => {
+    if (!scanFile) return;
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const result = await quickScanImage(scanFile);
+      setScanResult(result);
+    } catch (err) {
+      setScanResult({ error: err.message || "AI service unavailable." });
+    }
+    setScanning(false);
+  };
+
+  const resetScan = () => {
+    setScanFile(null);
+    setScanPreview(null);
+    setScanResult(null);
+    if (scanInputRef.current) scanInputRef.current.value = "";
   };
 
   const getImageUrl = (img) => {
@@ -84,209 +141,299 @@ export default function AnalyzePage() {
         </div>
 
         <div className="col-span-12 md:col-span-5 text-[#c6c6cd] font-body text-sm leading-relaxed pb-2 border-l border-[#222a3d] pl-6">
-          Upload an image and let the AI detect whether it is real or
-          manipulated. AI verification is{" "}
-          <strong className="text-[#adc6ff]">optional</strong> — you can upload
-          first and verify later.
+          <strong className="text-[#adc6ff]">Two modes:</strong> Upload & save
+          to gallery (verify later), or{" "}
+          <strong className="text-[#4edea3]">Quick Scan</strong> — instantly
+          analyze any image with AI without saving it. Works even if the Gallery
+          is offline.
         </div>
       </section>
 
-      {/* Upload */}
-      <UploadZone onUploadComplete={handleUploadComplete} />
+      {/* ─── Mode Tabs ─── */}
+      <section className="flex items-center gap-3">
+        <div className="flex bg-[#060e20] p-1.5 rounded-2xl border border-white/5">
+          <button
+            onClick={() => setMode("upload")}
+            className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
+              mode === "upload"
+                ? "bg-[#2d3449] text-[#adc6ff] shadow-lg"
+                : "text-slate-500 hover:text-white"
+            }`}
+          >
+            <Upload size={16} />
+            Upload & Save
+          </button>
+          <button
+            onClick={() => setMode("quickscan")}
+            className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
+              mode === "quickscan"
+                ? "bg-[#4edea3]/10 text-[#4edea3] shadow-lg"
+                : "text-slate-500 hover:text-white"
+            }`}
+          >
+            <ScanSearch size={16} />
+            Quick Scan
+          </button>
+        </div>
+        {mode === "quickscan" && (
+          <span className="text-[9px] font-bold text-[#4edea3] bg-[#4edea3]/10 px-3 py-1 rounded-full uppercase tracking-widest">
+            No Gallery needed
+          </span>
+        )}
+      </section>
 
-      {/* Latest Result Section */}
-      {latestResult && (
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
-              <BarChart3 size={16} />
-              Most Recent Analysis
-            </h4>
+      {/* ─── Upload & Save Mode ─── */}
+      {mode === "upload" && (
+        <>
+          <UploadZone onUploadComplete={handleUploadComplete} />
 
-            <span className="text-[10px] text-slate-700 font-bold uppercase tracking-widest">
-              Image ID: #{latestResult.id}
-            </span>
-          </div>
+          {/* Latest Result Section */}
+          {latestResult && (
+            <section className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                  <BarChart3 size={16} />
+                  Most Recent Analysis
+                </h4>
+                <span className="text-[10px] text-slate-700 font-bold uppercase tracking-widest">
+                  Image ID: #{latestResult.id}
+                </span>
+              </div>
 
-          <div className="grid grid-cols-12 gap-6">
-            {/* Image Result */}
-            <div className="col-span-12 lg:col-span-8 group relative overflow-hidden rounded-3xl shadow-2xl border border-white/5 min-h-[300px]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt="Analyzed Image"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                src={getImageUrl(latestResult)}
-              />
-              {/* Scanning Line Effect */}
-              <div className="absolute top-0 left-0 w-full h-0.5 bg-[#adc6ff]/50 shadow-[0_0_15px_#adc6ff] animate-scan"></div>
+              <div className="grid grid-cols-12 gap-6">
+                {/* Image Result */}
+                <div className="col-span-12 lg:col-span-8 group relative overflow-hidden rounded-3xl shadow-2xl border border-white/5 min-h-[300px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt="Analyzed Image"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                    src={getImageUrl(latestResult)}
+                  />
+                  <div className="absolute top-0 left-0 w-full h-0.5 bg-[#adc6ff]/50 shadow-[0_0_15px_#adc6ff] animate-scan"></div>
 
-              {/* Verdict */}
-              <div className="absolute top-6 left-6 flex items-center gap-4">
-                <div
-                  className={`bg-[#2d3449]/60 backdrop-blur-md px-4 py-2 flex items-center gap-3 rounded-xl border ${
-                    isAuthentic
-                      ? "border-[#4edea3]/30"
-                      : isFake
-                      ? "border-[#eb4141]/30"
-                      : "border-[#fbbf24]/30"
-                  }`}
-                >
-                  <span
-                    className={`flex h-2.5 w-2.5 rounded-full ${
-                      isAuthentic
-                        ? "bg-[#4edea3]"
-                        : isFake
-                        ? "bg-[#eb4141]"
-                        : "bg-[#fbbf24]"
-                    }`}
-                  ></span>
-                  <span
-                    className={`font-black font-headline tracking-[0.2em] text-xs ${
-                      isAuthentic
-                        ? "text-[#4edea3]"
-                        : isFake
-                        ? "text-[#eb4141]"
-                        : "text-[#fbbf24]"
-                    }`}
-                  >
-                    {isAuthentic ? "REAL" : isFake ? "FAKE" : "PENDING"}
-                  </span>
+                  <div className="absolute top-6 left-6 flex items-center gap-4">
+                    <div
+                      className={`bg-[#2d3449]/60 backdrop-blur-md px-4 py-2 flex items-center gap-3 rounded-xl border ${
+                        isAuthentic ? "border-[#4edea3]/30" : isFake ? "border-[#eb4141]/30" : "border-[#fbbf24]/30"
+                      }`}
+                    >
+                      <span className={`flex h-2.5 w-2.5 rounded-full ${
+                        isAuthentic ? "bg-[#4edea3]" : isFake ? "bg-[#eb4141]" : "bg-[#fbbf24]"
+                      }`}></span>
+                      <span className={`font-black font-headline tracking-[0.2em] text-xs ${
+                        isAuthentic ? "text-[#4edea3]" : isFake ? "text-[#eb4141]" : "text-[#fbbf24]"
+                      }`}>
+                        {isAuthentic ? "REAL" : isFake ? "FAKE" : "PENDING"}
+                      </span>
+                    </div>
+                    {confidence != null && (
+                      <div className="bg-[#2d3449]/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                        <span className="text-white text-[10px] font-bold uppercase">Confidence: </span>
+                        <span className="text-[#adc6ff] font-black font-headline text-xs">
+                          {Number(confidence).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="absolute bottom-8 right-8 flex flex-col gap-2 items-end">
+                    <div className="bg-[#2d3449]/80 backdrop-blur-md p-3 rounded-lg border-l-2 border-[#adc6ff]">
+                      <p className="text-[9px] text-[#adc6ff] font-black uppercase mb-1">Image Info</p>
+                      <p className="text-[10px] font-mono text-slate-300">
+                        {latestResult.title || latestResult.original_filename}
+                      </p>
+                    </div>
+                    <div className={`bg-[#2d3449]/80 backdrop-blur-md p-3 rounded-lg border-l-2 ${
+                      isAuthentic ? "border-[#4edea3]" : isFake ? "border-[#eb4141]" : "border-[#fbbf24]"
+                    }`}>
+                      <p className={`text-[9px] font-black uppercase mb-1 ${
+                        isAuthentic ? "text-[#4edea3]" : isFake ? "text-[#eb4141]" : "text-[#fbbf24]"
+                      }`}>Analysis Result</p>
+                      <p className="text-[10px] font-mono text-slate-300">
+                        {isAuthentic ? "No strong manipulation detected" : isFake ? "Manipulation artifacts detected" : "Awaiting verification"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                {confidence != null && (
-                  <div className="bg-[#2d3449]/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
-                    <span className="text-white text-[10px] font-bold uppercase">
-                      Confidence:{" "}
-                    </span>
-                    <span className="text-[#adc6ff] font-black font-headline text-xs">
-                      {Number(confidence).toFixed(1)}%
-                    </span>
+                {/* Stats Panel */}
+                <div className="col-span-12 lg:col-span-4 space-y-4">
+                  <StatBox icon={<Dna size={16} />} label="Model" value="Neural Deep Analysis" color="#adc6ff" />
+                  <StatBox icon={<Zap size={16} />} label="Confidence" value={confidence != null ? `${Number(confidence).toFixed(1)}%` : "—"} color={isAuthentic ? "#4edea3" : isFake ? "#eb4141" : "#fbbf24"} />
+                  <StatBox icon={<ShieldCheck size={16} />} label="Verdict" value={isAuthentic ? "Authentic" : isFake ? "Modified" : "Pending"} color={isAuthentic ? "#4edea3" : isFake ? "#eb4141" : "#fbbf24"} />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Recent Uploads */}
+          {recentImages.length > 0 && (
+            <section className="space-y-4">
+              <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">
+                Recent Uploads
+              </h4>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {recentImages.map((image) => (
+                  <ArchiveCard
+                    key={image.id}
+                    image={image}
+                    imageUrl={getImageUrl(image)}
+                    verifying={verifying === image.id}
+                    onVerify={() => handleVerifyFromCard(image)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {/* ─── Quick Scan Mode ─── */}
+      {mode === "quickscan" && (
+        <section className="space-y-8">
+          <div className="p-8 rounded-3xl bg-[#131b2e] border border-[#4edea3]/10 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-[#4edea3]/10">
+                <ScanSearch size={20} className="text-[#4edea3]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Quick Scan</h3>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest">
+                  Instant AI analysis • No upload • No gallery • Works independently
+                </p>
+              </div>
+            </div>
+
+            {/* Drop zone or preview */}
+            {!scanPreview ? (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleScanDrop}
+                onClick={() => scanInputRef.current?.click()}
+                className="border-2 border-dashed border-[#4edea3]/20 rounded-2xl p-16 flex flex-col items-center justify-center cursor-pointer hover:border-[#4edea3]/50 hover:bg-[#4edea3]/5 transition-all duration-300 group"
+              >
+                <CloudUpload size={48} className="text-[#4edea3]/40 group-hover:text-[#4edea3] transition-colors mb-4" />
+                <p className="text-sm font-bold text-white mb-1">Drop image here or click to select</p>
+                <p className="text-[10px] text-slate-500">
+                  Analyze without saving to gallery — AI only
+                </p>
+                <input
+                  ref={scanInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleScanFileSelect}
+                  className="hidden"
+                />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Preview + Clear */}
+                <div className="relative rounded-2xl overflow-hidden border border-white/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={scanPreview}
+                    alt="Scan preview"
+                    className="w-full max-h-96 object-contain bg-black/40"
+                  />
+                  <button
+                    onClick={resetScan}
+                    className="absolute top-3 right-3 p-2 bg-black/60 rounded-full text-white hover:bg-red-500/80 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                  <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg">
+                    <p className="text-[10px] text-white font-bold">{scanFile?.name}</p>
+                    <p className="text-[8px] text-slate-400">
+                      {(scanFile?.size / 1024).toFixed(0)} KB
+                    </p>
+                  </div>
+                </div>
+
+                {/* Scan Button */}
+                {!scanResult && (
+                  <button
+                    onClick={handleQuickScan}
+                    disabled={scanning}
+                    className="w-full py-4 bg-gradient-to-r from-[#4edea3] to-[#357df1] text-white font-black uppercase tracking-widest rounded-2xl text-sm hover:shadow-xl hover:shadow-[#4edea3]/20 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {scanning ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" />
+                        AI is analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <ScanSearch size={20} />
+                        Scan with AI
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Scan Result */}
+                {scanResult && !scanResult.error && (
+                  <div className="space-y-4">
+                    <div className={`p-6 rounded-2xl border ${
+                      scanResult.is_modified
+                        ? "bg-[#eb4141]/5 border-[#eb4141]/20"
+                        : "bg-[#4edea3]/5 border-[#4edea3]/20"
+                    }`}>
+                      <div className="flex items-center gap-4 mb-4">
+                        {scanResult.is_modified ? (
+                          <AlertTriangle size={32} className="text-[#eb4141]" />
+                        ) : (
+                          <CheckCircle2 size={32} className="text-[#4edea3]" />
+                        )}
+                        <div>
+                          <h4 className={`text-2xl font-black ${
+                            scanResult.is_modified ? "text-[#eb4141]" : "text-[#4edea3]"
+                          }`}>
+                            {scanResult.is_modified ? "FAKE DETECTED" : "AUTHENTIC"}
+                          </h4>
+                          <p className="text-xs text-slate-400">
+                            AI Confidence: <strong className="text-white">{Number(scanResult.confidence || 0).toFixed(1)}%</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <ScanStat label="Model" value={scanResult.model || "Neural Analysis"} />
+                        <ScanStat label="Confidence" value={`${Number(scanResult.confidence || 0).toFixed(1)}%`} />
+                        <ScanStat label="Verdict" value={scanResult.is_modified ? "Modified" : "Authentic"} />
+                        <ScanStat label="Processing" value={scanResult.processing_time || "—"} />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={resetScan}
+                      className="w-full py-3 bg-[#222a3d] text-white font-bold uppercase tracking-widest rounded-xl text-xs hover:bg-[#2d3449] transition-colors"
+                    >
+                      Scan Another Image
+                    </button>
+                  </div>
+                )}
+
+                {/* Scan Error */}
+                {scanResult?.error && (
+                  <div className="p-6 rounded-2xl bg-[#eb4141]/5 border border-[#eb4141]/20 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle size={24} className="text-[#eb4141]" />
+                      <div>
+                        <h4 className="text-sm font-bold text-[#eb4141]">AI Service Unavailable</h4>
+                        <p className="text-[10px] text-slate-400">{scanResult.error}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setScanResult(null)}
+                      className="w-full py-2 bg-[#222a3d] text-white font-bold uppercase tracking-widest rounded-xl text-[10px] hover:bg-[#2d3449] transition-colors"
+                    >
+                      Try Again
+                    </button>
                   </div>
                 )}
               </div>
-
-              {/* Info boxes */}
-              <div className="absolute bottom-8 right-8 flex flex-col gap-2 items-end">
-                <div className="bg-[#2d3449]/80 backdrop-blur-md p-3 rounded-lg border-l-2 border-[#adc6ff]">
-                  <p className="text-[9px] text-[#adc6ff] font-black uppercase mb-1">
-                    Image Info
-                  </p>
-                  <p className="text-[10px] font-mono text-slate-300">
-                    {latestResult.title || latestResult.original_filename}
-                  </p>
-                </div>
-
-                <div
-                  className={`bg-[#2d3449]/80 backdrop-blur-md p-3 rounded-lg border-l-2 ${
-                    isAuthentic ? "border-[#4edea3]" : isFake ? "border-[#eb4141]" : "border-[#fbbf24]"
-                  }`}
-                >
-                  <p
-                    className={`text-[9px] font-black uppercase mb-1 ${
-                      isAuthentic ? "text-[#4edea3]" : isFake ? "text-[#eb4141]" : "text-[#fbbf24]"
-                    }`}
-                  >
-                    Analysis Result
-                  </p>
-                  <p className="text-[10px] font-mono text-slate-300">
-                    {isAuthentic
-                      ? "No strong manipulation detected"
-                      : isFake
-                      ? "Manipulation artifacts detected"
-                      : "Awaiting verification"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Side Panel */}
-            <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-              <div className="bg-[#222a3d] rounded-2xl p-6 flex-1 relative overflow-hidden border border-white/5">
-                <div className="absolute top-4 right-4 opacity-5">
-                  <Dna size={80} />
-                </div>
-
-                <h5 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
-                  <Zap size={14} className="text-[#adc6ff]" />
-                  Analysis Details
-                </h5>
-
-                <div className="space-y-5">
-                  {latestResult.ai_report ? (
-                    <>
-                      <ProgressItem
-                        label="Editing Artifacts"
-                        value={`${latestResult.ai_report.editing_artifacts || 10}%`}
-                        status={
-                          (latestResult.ai_report.editing_artifacts || 10) < 30
-                            ? "Low"
-                            : "High"
-                        }
-                      />
-                      <ProgressItem
-                        label="Compression Artifacts"
-                        value={`${latestResult.ai_report.compression_artifacts || 30}%`}
-                        status="Normal"
-                      />
-                      <ProgressItem
-                        label="Image Consistency"
-                        value={`${confidence ? Math.round(confidence) : 50}%`}
-                        status={
-                          confidence > 80 ? "High" : confidence > 50 ? "Medium" : "Low"
-                        }
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <ProgressItem label="Editing Artifacts" value="—" status="N/A" />
-                      <ProgressItem label="Compression Artifacts" value="—" status="N/A" />
-                      <ProgressItem label="Image Consistency" value="—" status="N/A" />
-                    </>
-                  )}
-                </div>
-
-                <div className="mt-10 pt-6 border-t border-slate-700/50">
-                  <h5 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">
-                    Image Information
-                  </h5>
-
-                  <div className="grid grid-cols-2 gap-y-4 gap-x-2">
-                    <ExifItem label="File" value={latestResult.original_filename || "—"} />
-                    <ExifItem label="Size" value={latestResult.file_size_display || "—"} />
-                    <ExifItem label="Dimensions" value={latestResult.dimensions_display || "—"} />
-                    <ExifItem label="Format" value={latestResult.mime_type || "—"} />
-                  </div>
-                </div>
-              </div>
-
-              <button className="bg-[#2d3449] hover:bg-[#31394d] transition-all py-4 rounded-2xl flex items-center justify-center gap-3 group active:scale-95 shadow-xl">
-                <FileDown size={18} />
-                <span className="text-[11px] font-black uppercase tracking-widest text-white">
-                  Download Result
-                </span>
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Recent Images */}
-      {recentImages.length > 0 && (
-        <section className="space-y-6">
-          <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">
-            Recent Images
-          </h4>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {recentImages.map((img) => (
-              <ArchiveCard
-                key={img.id}
-                image={img}
-                imageUrl={getImageUrl(img)}
-                verifying={verifying === img.id}
-                onVerify={() => handleVerifyFromCard(img)}
-              />
-            ))}
+            )}
           </div>
         </section>
       )}
@@ -294,22 +441,20 @@ export default function AnalyzePage() {
   );
 }
 
-/* Sub Components */
+/* ─── Sub Components ─── */
 
-function ProgressItem({ label, value, status }) {
+function StatBox({ icon, label, value, color }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400">
-        <span>{label}</span>
-        <span className="text-white">{status}</span>
+    <div className="bg-[#131b2e] border border-white/5 rounded-2xl p-5 flex flex-col gap-2 hover:border-white/10 transition-colors">
+      <div className="flex items-center gap-2 text-slate-500">
+        {icon}
+        <span className="text-[9px] font-black uppercase tracking-widest">
+          {label}
+        </span>
       </div>
-
-      <div className="h-1 bg-[#0b1326] rounded-full overflow-hidden">
-        <div
-          className="h-full bg-[#adc6ff] transition-all duration-700"
-          style={{ width: value === "—" ? "0%" : value }}
-        ></div>
-      </div>
+      <p className="text-lg font-black font-headline" style={{ color }}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -321,6 +466,15 @@ function ExifItem({ label, value }) {
         {label}
       </p>
       <p className="text-[11px] text-white font-medium truncate">{value}</p>
+    </div>
+  );
+}
+
+function ScanStat({ label, value }) {
+  return (
+    <div className="bg-[#131b2e] p-3 rounded-xl">
+      <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-xs text-white font-bold">{value}</p>
     </div>
   );
 }
@@ -355,7 +509,6 @@ function ArchiveCard({ image, imageUrl, verifying, onVerify }) {
           >
             {isReal ? "REAL" : isFake ? "FAKE" : "PENDING"}
           </span>
-
           <span className="text-[10px] text-slate-600 font-mono">
             #{image.id}
           </span>
@@ -370,7 +523,6 @@ function ArchiveCard({ image, imageUrl, verifying, onVerify }) {
             : "Recently"}
         </p>
 
-        {/* Verify button for pending images */}
         {isPending && (
           <button
             onClick={(e) => {
