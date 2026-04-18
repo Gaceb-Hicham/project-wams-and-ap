@@ -348,17 +348,77 @@ export default function AnalyzePage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Preview + Clear */}
-                <div className="relative rounded-2xl overflow-hidden border border-white/10">
+                {/* Preview + Clear — with scan animation like Most Recent Analysis */}
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={scanPreview}
                     alt="Scan preview"
-                    className="w-full max-h-96 object-contain bg-black/40"
+                    className={`w-full max-h-96 object-contain bg-black/40 transition-transform duration-1000 ${
+                      scanResult && !scanResult.error ? "group-hover:scale-105" : ""
+                    }`}
                   />
+
+                  {/* Scan line animation — active during scanning OR after result */}
+                  {(scanning || (scanResult && !scanResult.error)) && (
+                    <div className="absolute top-0 left-0 w-full h-0.5 bg-[#adc6ff]/50 shadow-[0_0_15px_#adc6ff] animate-scan"></div>
+                  )}
+
+                  {/* Scanning overlay */}
+                  {scanning && (
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                      <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md px-6 py-3 rounded-2xl border border-[#4edea3]/30">
+                        <Loader2 size={20} className="text-[#4edea3] animate-spin" />
+                        <span className="text-sm font-bold text-white uppercase tracking-widest">AI Analyzing…</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Result overlay badges — same style as Most Recent Analysis */}
+                  {scanResult && !scanResult.error && (
+                    <>
+                      <div className="absolute top-6 left-6 flex items-center gap-4">
+                        <div
+                          className={`bg-[#2d3449]/60 backdrop-blur-md px-4 py-2 flex items-center gap-3 rounded-xl border ${
+                            scanResult.is_modified ? "border-[#eb4141]/30" : "border-[#4edea3]/30"
+                          }`}
+                        >
+                          <span className={`flex h-2.5 w-2.5 rounded-full ${
+                            scanResult.is_modified ? "bg-[#eb4141]" : "bg-[#4edea3]"
+                          }`}></span>
+                          <span className={`font-black font-headline tracking-[0.2em] text-xs ${
+                            scanResult.is_modified ? "text-[#eb4141]" : "text-[#4edea3]"
+                          }`}>
+                            {scanResult.is_modified ? "FAKE" : "REAL"}
+                          </span>
+                        </div>
+                        <div className="bg-[#2d3449]/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                          <span className="text-white text-[10px] font-bold uppercase">Confidence: </span>
+                          <span className="text-[#adc6ff] font-black font-headline text-xs">
+                            {Number(scanResult.confidence || 0).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="absolute bottom-6 right-6">
+                        <div className={`bg-[#2d3449]/80 backdrop-blur-md p-3 rounded-lg border-l-2 ${
+                          scanResult.is_modified ? "border-[#eb4141]" : "border-[#4edea3]"
+                        }`}>
+                          <p className={`text-[9px] font-black uppercase mb-1 ${
+                            scanResult.is_modified ? "text-[#eb4141]" : "text-[#4edea3]"
+                          }`}>Analysis Result</p>
+                          <p className="text-[10px] font-mono text-slate-300">
+                            {scanResult.is_modified ? "Manipulation artifacts detected" : "No manipulation detected"}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Close button */}
                   <button
                     onClick={resetScan}
-                    className="absolute top-3 right-3 p-2 bg-black/60 rounded-full text-white hover:bg-red-500/80 transition-colors"
+                    className="absolute top-3 right-3 p-2 bg-black/60 rounded-full text-white hover:bg-red-500/80 transition-colors z-10"
                   >
                     <X size={16} />
                   </button>
