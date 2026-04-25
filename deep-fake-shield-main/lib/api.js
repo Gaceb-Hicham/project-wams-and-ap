@@ -13,13 +13,13 @@
  */
 
 const AUTH_URL =
-  process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8000";
 const GALLERY_URL =
-  process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+  process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 const AI_URL =
-  process.env.NEXT_PUBLIC_AI_URL || "http://localhost:8002";
+  process.env.NEXT_PUBLIC_AI_URL ?? "http://localhost:8002";
 const HISTORIQUE_URL =
-  process.env.NEXT_PUBLIC_HISTORIQUE_URL || "http://localhost:8003";
+  process.env.NEXT_PUBLIC_HISTORIQUE_URL ?? "http://localhost:8003";
 
 // ─── Token helpers ────────────────────────────────────────────
 export function getToken() {

@@ -22,13 +22,12 @@ class AlbumSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user_id', 'user_username', 'created_at', 'updated_at']
 
     def get_cover_url(self, obj):
-        request = self.context.get('request')
         # Use explicit cover or first image in album
         cover = obj.cover_image or obj.images.first()
-        if cover and cover.thumbnail and request:
-            return request.build_absolute_uri(cover.thumbnail.url)
-        if cover and cover.image_file and request:
-            return request.build_absolute_uri(cover.image_file.url)
+        if cover and cover.thumbnail:
+            return cover.thumbnail.url
+        if cover and cover.image_file:
+            return cover.image_file.url
         return None
 
 
@@ -54,15 +53,13 @@ class ImageSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_thumbnail_url(self, obj):
-        request = self.context.get('request')
-        if obj.thumbnail and request:
-            return request.build_absolute_uri(obj.thumbnail.url)
+        if obj.thumbnail:
+            return obj.thumbnail.url
         return self.get_image_url(obj)
 
     def get_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.image_file and request:
-            return request.build_absolute_uri(obj.image_file.url)
+        if obj.image_file:
+            return obj.image_file.url
         return None
 
 

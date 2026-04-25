@@ -9,7 +9,7 @@ import {
 import ImagePreview from "./ImagePreview";
 import { deleteImage, toggleFavorite, getAlbums, addImagesToAlbum, verifyImage } from "@/lib/api";
 
-const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 
 export default function GalleryGrid({ images, onImageDeleted, onImageUpdated }) {
   const [activeImage, setActiveImage] = useState(null);

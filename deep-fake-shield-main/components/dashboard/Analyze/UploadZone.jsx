@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { CloudUpload, ShieldCheck, Database, Loader2, X, CheckCircle2 } from "lucide-react";
 import { uploadImage } from "@/lib/api";
 
-const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 
 export default function UploadZone({ onUploadComplete }) {
   const fileInputRef = useRef(null);

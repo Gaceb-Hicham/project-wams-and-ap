@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { getImages, getStats, getAuditLogs, getAuditStats, getUser } from "@/lib/api";
 
-const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 
 export default function HistoryPage() {
   const [images, setImages] = useState([]);

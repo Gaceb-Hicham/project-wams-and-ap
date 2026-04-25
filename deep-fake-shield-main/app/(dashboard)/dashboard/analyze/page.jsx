@@ -18,7 +18,7 @@ import UploadZone from "@/components/dashboard/Analyze/UploadZone";
 import { getImages, verifyImage, quickScanImage, uploadImage } from "@/lib/api";
 
 const GALLERY_URL =
-  process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+  process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 
 export default function AnalyzePage() {
   const [latestResult, setLatestResult] = useState(null);

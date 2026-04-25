@@ -6,7 +6,7 @@ import { getFavorites, toggleFavorite, deleteImage } from "@/lib/api";
 import ImagePreview from "@/components/dashboard/ImagePreview";
 
 const GALLERY_URL =
-  process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+  process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 
 export default function FavoritesPage() {
   const [favorites, setFavorites] = useState([]);

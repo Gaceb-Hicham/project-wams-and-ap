@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:8000";
+const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8000";
 
 export const authOptions = {
   providers: [

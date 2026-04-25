@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { X, Download, Trash2, Maximize, Share2, ShieldCheck, Loader2, Heart } from "lucide-react";
 import { verifyImage, toggleFavorite } from "@/lib/api";
 
-const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL || "http://localhost:8001";
+const GALLERY_URL = process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
 
 export default function ImagePreview({ activeImage, onClose, onDelete, onFavoriteChanged }) {
   const [verifying, setVerifying] = useState(false);
