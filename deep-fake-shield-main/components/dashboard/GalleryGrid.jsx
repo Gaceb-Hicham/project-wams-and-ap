@@ -120,6 +120,7 @@ export default function GalleryGrid({ images, onImageDeleted, onImageUpdated }) 
       // Update the card status in real-time
       setUpdatedImages((prev) => ({ ...prev, [imgId]: updated }));
       setVerifyingId(null);
+      onImageUpdated?.();
       // Open the detail modal to show the results
       setActiveImage({ ...img, ...updated, fullUrl: getFullUrl(img) });
     } catch {

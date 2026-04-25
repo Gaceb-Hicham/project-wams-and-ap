@@ -1,4 +1,5 @@
 import os
+import functools
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -25,6 +26,7 @@ def get_user_from_request(request):
 
 def require_auth(view_func):
     """Decorator for API views that require authentication."""
+    @functools.wraps(view_func)
     def wrapper(request, *args, **kwargs):
         user = get_user_from_request(request)
         if not user:

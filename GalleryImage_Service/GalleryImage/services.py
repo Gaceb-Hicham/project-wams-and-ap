@@ -21,7 +21,7 @@ class AuthService:
     @classmethod
     def verify_token(cls, token):
         """Verify JWT with Auth service. Returns user info dict or None."""
-        cache_key = f"auth_token_{hash(token)}"
+        cache_key = f"auth_token_{__import__('hashlib').sha256(token.encode()).hexdigest()[:16]}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached

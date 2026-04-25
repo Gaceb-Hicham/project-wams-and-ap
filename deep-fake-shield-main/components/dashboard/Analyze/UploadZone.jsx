@@ -50,12 +50,14 @@ export default function UploadZone({ onUploadComplete }) {
     }
     setError("");
     setFile(f);
+    if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(f));
     if (!title) setTitle(f.name.replace(/\.[^/.]+$/, ""));
     setUploadResult(null);
   };
 
   const clearFile = () => {
+    if (preview) URL.revokeObjectURL(preview);
     setFile(null);
     setPreview(null);
     setTitle("");

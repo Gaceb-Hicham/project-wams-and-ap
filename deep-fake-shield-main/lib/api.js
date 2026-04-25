@@ -30,7 +30,13 @@ export function getToken() {
 export function getUser() {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem("user");
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    localStorage.removeItem("user");
+    return null;
+  }
 }
 
 export function saveSession(userData, token) {
@@ -52,9 +58,9 @@ async function apiFetch(baseUrl, path, options = {}) {
   const url = `${baseUrl}${path}`;
   const headers = { ...options.headers };
 
-  // Attach JWT for gallery requests
+  // Attach JWT for all authenticated requests
   const token = getToken();
-  if (token && baseUrl === GALLERY_URL) {
+  if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 

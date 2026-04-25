@@ -46,6 +46,11 @@ export default function GalleryPage() {
     setStats((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
   };
 
+  const handleImageUpdated = () => {
+    // Reload stats when an image is verified (status changes)
+    getStats().then(setStats).catch(() => {});
+  };
+
   // Filter images by search + status
   const filteredImages = images.filter((img) => {
     const matchesSearch =
@@ -145,7 +150,7 @@ export default function GalleryPage() {
       </section>
 
       {/* Gallery Grid */}
-      <GalleryGrid images={filteredImages} onImageDeleted={handleImageDeleted} />
+      <GalleryGrid images={filteredImages} onImageDeleted={handleImageDeleted} onImageUpdated={handleImageUpdated} />
 
       {/* Capacity Indicator */}
       <section className="mt-12 p-6 rounded-3xl bg-[#131b2e] border border-white/5 flex items-center justify-between">
