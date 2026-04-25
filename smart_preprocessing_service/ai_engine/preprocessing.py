@@ -31,7 +31,7 @@ def preprocess_image(image_input):
     img = img.convert('RGB')
 
     # Step 3: Resize to model's expected input size
-    img = img.resize((config.INPUT_SIZE, config.INPUT_SIZE), Image.LANCZOS)
+    img = img.resize((config.INPUT_SIZE, config.INPUT_SIZE), Image.BILINEAR)
 
     # Step 4: Convert to numpy array and normalize to [0, 1]
     arr = np.array(img, dtype=np.float32) / 255.0

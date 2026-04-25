@@ -18,8 +18,8 @@ MODEL_ARCH = 'resnet18'
 # ─── Input Parameters ───────────────────────────────────────
 # These MUST match what was used during training.
 INPUT_SIZE = 224                    # Image will be resized to INPUT_SIZE x INPUT_SIZE
-NUM_CLASSES = 2                     # 0 = Real (authentic), 1 = Fake (manipulated)
-CLASS_NAMES = ['real', 'fake']      # Labels for each class index
+NUM_CLASSES = 2                     # 0 = Fake (manipulated), 1 = Real (authentic)
+CLASS_NAMES = ['fake', 'real']      # Labels for each class index (0 = Fake, 1 = Real)
 
 # ─── ImageNet Normalization ──────────────────────────────────
 # Standard values used by ALL pretrained models (ResNet, MobileNet, EfficientNet).
@@ -34,4 +34,7 @@ CONFIDENCE_THRESHOLD = 0.5
 # ─── Mock Mode ───────────────────────────────────────────────
 # When True OR when model.pth doesn't exist, returns mock predictions for testing.
 # Set to False once you have the real model.
+
+# MOCK_MODE = False
 MOCK_MODE = not os.path.exists(MODEL_PATH)
+

@@ -61,10 +61,12 @@ def _load_pytorch_model():
 
     except ImportError:
         logger.error("PyTorch not installed. Install with: pip install torch torchvision")
+
         _model_loaded = True
         return None
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
+
         _model_loaded = True
         return None
 
@@ -95,19 +97,20 @@ def predict(preprocessed_image):
             output = model(tensor)
             probabilities = torch.softmax(output, dim=1).numpy()[0]
 
-        # Class 0 = Real, Class 1 = Fake
+        # Class 0 = Fake, Class 1 = Real
         predicted_class = int(np.argmax(probabilities))
         confidence = float(probabilities[predicted_class]) * 100
 
-        is_modified = predicted_class == 1  # 1 = Fake
+        is_modified = predicted_class == 0  # 0 = Fake (manipulated)
+
 
         return {
             'is_modified': is_modified,
             'confidence': round(confidence, 2),
             'class_name': config.CLASS_NAMES[predicted_class],
             'probabilities': {
-                'real': round(float(probabilities[0]) * 100, 2),
-                'fake': round(float(probabilities[1]) * 100, 2),
+                'fake': round(float(probabilities[0]) * 100, 2),
+                'real': round(float(probabilities[1]) * 100, 2),
             },
             'model': config.MODEL_ARCH,
             'mock': False,
