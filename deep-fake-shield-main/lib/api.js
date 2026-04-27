@@ -13,13 +13,13 @@
  */
 
 const AUTH_URL =
-  process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_AUTH_URL || "";
 const GALLERY_URL =
-  process.env.NEXT_PUBLIC_GALLERY_URL ?? "http://localhost:8001";
+  process.env.NEXT_PUBLIC_GALLERY_URL || "";
 const AI_URL =
-  process.env.NEXT_PUBLIC_AI_URL ?? "http://localhost:8002";
+  process.env.NEXT_PUBLIC_AI_URL || "";
 const HISTORIQUE_URL =
-  process.env.NEXT_PUBLIC_HISTORIQUE_URL ?? "http://localhost:8003";
+  process.env.NEXT_PUBLIC_HISTORIQUE_URL || "";
 
 // ─── Token helpers ────────────────────────────────────────────
 export function getToken() {
@@ -56,7 +56,7 @@ export function isAuthenticated() {
 // ─── Core fetch wrapper ───────────────────────────────────────
 async function apiFetch(baseUrl, path, options = {}) {
   const url = `${baseUrl}${path}`;
-  const headers = { ...options.headers };
+  const headers = { "Accept": "application/json", ...options.headers };
 
   // Attach JWT for all authenticated requests
   const token = getToken();
@@ -269,15 +269,39 @@ export async function getAuditStats(userId) {
 //  Independent Health Checks — Each service checked DIRECTLY.
 //  No single point of failure. If Gallery is down, you can still
 //  see that Auth, AI, and Historique are healthy.
+//
+//  Includes retry logic to handle transient failures during
+//  service startup or temporary network issues.
 // ═══════════════════════════════════════════════════════════════
 
-async function checkHealth(url, path) {
-  try {
-    const res = await fetch(`${url}${path}`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
-  } catch {
-    return false;
+async function checkHealth(url, path, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${url}${path}`, {
+        headers: { "Accept": "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) return true;
+      // If the response is a redirect (opaque redirect), try to follow it
+      if (res.type === "opaqueredirect" || res.redirected) {
+        // Follow the redirect manually
+        const redirectUrl = res.url || `${url}${path}`;
+        const res2 = await fetch(redirectUrl, {
+          headers: { "Accept": "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res2.ok) return true;
+      }
+    } catch {
+      // On failure, wait before retry (exponential backoff)
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
   }
+  return false;
 }
 
 export async function checkAllServicesHealth() {

@@ -1,9 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, Filter, Image as ImageIcon, Activity, Loader2 } from "lucide-react";
 import GalleryGrid from "@/components/dashboard/GalleryGrid";
 import { getImages, getStats, checkAllServicesHealth } from "@/lib/api";
+
+/**
+ * Compute stats from an images array — used as a fallback when
+ * the stats API endpoint fails (auth timeout, network issues, etc.).
+ */
+function computeStatsFromImages(images) {
+  return {
+    total: images.length,
+    pending: images.filter((i) => i.verification_status === "pending").length,
+    unedited: images.filter((i) => i.verification_status === "unedited").length,
+    edited: images.filter((i) => i.verification_status === "edited").length,
+  };
+}
 
 export default function GalleryPage() {
   const [images, setImages] = useState([]);
@@ -12,43 +25,103 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const healthIntervalRef = useRef(null);
 
-  useEffect(() => {
-    loadData();
-    loadHealth();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async (isRetry = false) => {
     try {
       const [imgData, statsData] = await Promise.allSettled([
         getImages(),
         getStats(),
       ]);
-      if (imgData.status === "fulfilled") setImages(imgData.value);
-      if (statsData.status === "fulfilled") setStats(statsData.value);
+
+      let loadedImages = [];
+      if (imgData.status === "fulfilled") {
+        loadedImages = imgData.value;
+        setImages(loadedImages);
+      }
+
+      if (statsData.status === "fulfilled") {
+        setStats(statsData.value);
+      } else if (loadedImages.length > 0) {
+        // ── FALLBACK: Stats API failed but images loaded ──
+        // Compute stats client-side from actual image data.
+        // This permanently fixes the "0 images" bug when
+        // the stats endpoint fails due to auth timing issues.
+        setStats(computeStatsFromImages(loadedImages));
+      }
+
+      // If images loaded but stats didn't, retry stats once after a delay
+      if (imgData.status === "fulfilled" && statsData.status !== "fulfilled" && !isRetry) {
+        setTimeout(async () => {
+          try {
+            const retryStats = await getStats();
+            setStats(retryStats);
+          } catch {
+            // Keep the fallback stats computed above
+          }
+        }, 3000);
+      }
     } catch (e) {
       console.error("Failed to load gallery data:", e);
+      // Retry after a delay on catastrophic failure
+      if (!isRetry) {
+        setTimeout(() => loadData(true), 3000);
+      }
     }
     setLoading(false);
-  };
+  }, []);
 
-  const loadHealth = async () => {
+  const loadHealth = useCallback(async () => {
     try {
       const data = await checkAllServicesHealth();
       setHealth(data);
     } catch {
       setHealth({ auth: false, gallery: false, ai: false, historique: false });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    loadHealth();
+
+    // ── Periodic health polling every 30s ──
+    // Keeps the dashboard status indicators live and accurate.
+    healthIntervalRef.current = setInterval(loadHealth, 30000);
+
+    // ── Refresh health on window focus ──
+    // Quickly recovers from stale state when user returns to the tab.
+    const onFocus = () => loadHealth();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(healthIntervalRef.current);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadData, loadHealth]);
 
   const handleImageDeleted = (deletedId) => {
-    setImages((prev) => prev.filter((img) => img.id !== deletedId));
-    setStats((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+    setImages((prev) => {
+      const updated = prev.filter((img) => img.id !== deletedId);
+      // Recompute stats from remaining images
+      setStats(computeStatsFromImages(updated));
+      return updated;
+    });
   };
 
   const handleImageUpdated = () => {
     // Reload stats when an image is verified (status changes)
-    getStats().then(setStats).catch(() => {});
+    getStats()
+      .then(setStats)
+      .catch(() => {
+        // Fallback: recompute from images
+        setStats((prev) => prev);
+        getImages()
+          .then((imgs) => {
+            setImages(imgs);
+            setStats(computeStatsFromImages(imgs));
+          })
+          .catch(() => {});
+      });
   };
 
   // Filter images by search + status

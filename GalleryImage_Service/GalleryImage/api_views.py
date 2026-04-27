@@ -185,23 +185,10 @@ def stats_api(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_api(request):
-    """Service health check — runs checks in parallel to avoid slow timeouts."""
-    from concurrent.futures import ThreadPoolExecutor
-
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        auth_future = pool.submit(AuthService.is_healthy)
-        ai_future = pool.submit(AIVerificationService.is_healthy)
-        hist_future = pool.submit(HistoriqueService.is_healthy)
-
+    """Service health check — reports only this service's status."""
     return Response({
         'status': 'healthy',
         'service': 'GalleryImage_Service',
-        'services': {
-            'gallery': True,  # If this endpoint responds, Gallery is healthy
-            'auth': auth_future.result(),
-            'ai': ai_future.result(),
-            'historique': hist_future.result(),
-        }
     })
 
 
