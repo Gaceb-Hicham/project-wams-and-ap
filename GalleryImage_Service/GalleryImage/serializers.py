@@ -25,10 +25,16 @@ class AlbumSerializer(serializers.ModelSerializer):
         # Use explicit cover or first image in album
         cover = obj.cover_image or obj.images.first()
         if cover and cover.thumbnail:
-            return cover.thumbnail.url
+            return self._build_media_url(cover.thumbnail.url)
         if cover and cover.image_file:
-            return cover.image_file.url
+            return self._build_media_url(cover.image_file.url)
         return None
+
+    def _build_media_url(self, url):
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class ImageSerializer(serializers.ModelSerializer):
@@ -54,13 +60,19 @@ class ImageSerializer(serializers.ModelSerializer):
 
     def get_thumbnail_url(self, obj):
         if obj.thumbnail:
-            return obj.thumbnail.url
+            return self._build_media_url(obj.thumbnail.url)
         return self.get_image_url(obj)
 
     def get_image_url(self, obj):
         if obj.image_file:
-            return obj.image_file.url
+            return self._build_media_url(obj.image_file.url)
         return None
+
+    def _build_media_url(self, url):
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class ImageUploadSerializer(serializers.Serializer):

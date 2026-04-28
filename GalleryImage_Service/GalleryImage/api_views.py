@@ -46,7 +46,7 @@ def image_list_api(request):
     uid = request.user_info['user_id']
 
     if request.method == 'GET':
-        images = Image.objects.filter(user_id=uid)
+        images = Image.objects.filter(user_id=uid).select_related('album').prefetch_related('tags')
         status_filter = request.query_params.get('status')
         if status_filter:
             images = images.filter(verification_status=status_filter)
@@ -107,7 +107,10 @@ def image_list_api(request):
 def image_detail_api(request, image_id):
     """GET: image detail with verifications. DELETE: remove image."""
     try:
-        image = Image.objects.get(id=image_id, user_id=request.user_info['user_id'])
+        image = Image.objects.select_related('album').prefetch_related('tags', 'verifications').get(
+            id=image_id,
+            user_id=request.user_info['user_id'],
+        )
     except Image.DoesNotExist:
         return Response({'error': 'Image not found.'}, status=404)
 
@@ -369,5 +372,5 @@ def toggle_favorite_api(request, image_id):
 def favorites_list_api(request):
     """GET: list all favorite images for current user."""
     uid = request.user_info['user_id']
-    images = Image.objects.filter(user_id=uid, is_favorite=True)
+    images = Image.objects.filter(user_id=uid, is_favorite=True).select_related('album').prefetch_related('tags')
     return Response(ImageSerializer(images, many=True, context={'request': request}).data)

@@ -55,8 +55,9 @@ export function isAuthenticated() {
 
 // ─── Core fetch wrapper ───────────────────────────────────────
 async function apiFetch(baseUrl, path, options = {}) {
+  const { timeoutMs = 8000, signal: providedSignal, ...fetchOptions } = options;
   const url = `${baseUrl}${path}`;
-  const headers = { "Accept": "application/json", ...options.headers };
+  const headers = { "Accept": "application/json", ...fetchOptions.headers };
 
   // Attach JWT for all authenticated requests
   const token = getToken();
@@ -65,11 +66,15 @@ async function apiFetch(baseUrl, path, options = {}) {
   }
 
   // Only set Content-Type for non-FormData bodies
-  if (options.body && !(options.body instanceof FormData)) {
+  if (fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, {
+    ...fetchOptions,
+    headers,
+    signal: providedSignal || AbortSignal.timeout(timeoutMs),
+  });
 
   // Attempt to parse JSON, fall back to text
   let data;
@@ -121,6 +126,7 @@ export async function uploadImage(formData) {
   return apiFetch(GALLERY_URL, "/gallery/api/images/", {
     method: "POST",
     body: formData, // FormData — browser sets multipart boundary
+    timeoutMs: 60000,
   });
 }
 
@@ -133,6 +139,7 @@ export async function deleteImage(id) {
 export async function verifyImage(id) {
   return apiFetch(GALLERY_URL, `/gallery/api/images/${id}/verify/`, {
     method: "POST",
+    timeoutMs: 45000,
   });
 }
 
@@ -270,38 +277,21 @@ export async function getAuditStats(userId) {
 //  No single point of failure. If Gallery is down, you can still
 //  see that Auth, AI, and Historique are healthy.
 //
-//  Includes retry logic to handle transient failures during
-//  service startup or temporary network issues.
+//  Single fast check per call — the dashboard polls every 15s,
+//  so transient failures self-correct on the next poll cycle.
 // ═══════════════════════════════════════════════════════════════
 
-async function checkHealth(url, path, retries = 2) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(`${url}${path}`, {
-        headers: { "Accept": "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) return true;
-      // If the response is a redirect (opaque redirect), try to follow it
-      if (res.type === "opaqueredirect" || res.redirected) {
-        // Follow the redirect manually
-        const redirectUrl = res.url || `${url}${path}`;
-        const res2 = await fetch(redirectUrl, {
-          headers: { "Accept": "application/json" },
-          cache: "no-store",
-          signal: AbortSignal.timeout(5000),
-        });
-        if (res2.ok) return true;
-      }
-    } catch {
-      // On failure, wait before retry (exponential backoff)
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-      }
-    }
+async function checkHealth(url, path) {
+  try {
+    const res = await fetch(`${url}${path}`, {
+      headers: { "Accept": "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 export async function checkAllServicesHealth() {

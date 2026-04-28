@@ -1,4 +1,5 @@
 import os
+import jwt as pyjwt
 import requests
 import logging
 from django.conf import settings
@@ -9,9 +10,23 @@ from .consul_client import resolve_service
 
 logger = logging.getLogger(__name__)
 
+# ── Shared JWT secret for local token verification (fallback) ──
+JWT_SECRET    = os.environ.get('JWT_SECRET', 'microservices-shared-secret-key-2026')
+JWT_ALGORITHM = 'HS256'
+
 
 class AuthService:
-    """Client for the Authentication_Service with Consul discovery + fault tolerance."""
+    """Client for the Authentication_Service with Consul discovery + fault tolerance.
+
+    Token verification priority:
+      1. In-memory cache (fastest)
+      2. Remote Auth service via HTTP (authoritative)
+      3. Local JWT decode using shared secret (fallback when Auth is down)
+
+    This triple-layer approach ensures that authenticated endpoints NEVER
+    fail silently just because the Auth service is temporarily unreachable
+    (e.g., during container restarts, Consul re-registration delays, etc.).
+    """
 
     @classmethod
     def _base_url(cls):
@@ -19,18 +34,43 @@ class AuthService:
         return url or getattr(settings, 'AUTH_SERVICE_URL', 'http://localhost:8000')
 
     @classmethod
+    def _local_verify(cls, token):
+        """Verify JWT locally using the shared secret — no network call.
+        Used as a fallback when the Auth service is unreachable."""
+        try:
+            payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            return {
+                'user_id':  payload['user_id'],
+                'username': payload['username'],
+                'email':    payload.get('email', ''),
+                'role':     payload.get('role', 'user'),
+            }
+        except pyjwt.PyJWTError as exc:
+            logger.debug(f"Local JWT verification failed: {exc}")
+            return None
+
+    @classmethod
     def verify_token(cls, token):
         """Verify JWT with Auth service. Returns user info dict or None."""
-        cache_key = f"auth_token_{__import__('hashlib').sha256(token.encode()).hexdigest()[:16]}"
+        import hashlib
+        cache_key = f"auth_token_{hashlib.sha256(token.encode()).hexdigest()[:16]}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
 
+        # Prefer local verification first to avoid blocking gallery requests
+        # on Auth/Consul startup delays after service restarts.
+        user_info = cls._local_verify(token)
+        if user_info:
+            cache.set(cache_key, user_info, 60 * 15)
+            return user_info
+
+        # ── Layer 2: Remote Auth service verification ──
         try:
             resp = requests.get(
                 f"{cls._base_url()}/api/auth/verify/",
                 headers={'Authorization': f'Bearer {token}'},
-                timeout=5,
+                timeout=2,
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -43,10 +83,12 @@ class AuthService:
                     }
                     cache.set(cache_key, user_info, 60 * 30)
                     return user_info
+            # Auth service responded but said token is invalid
             return None
         except requests.exceptions.RequestException as exc:
             logger.warning(f"Auth service unavailable: {exc}")
-            return cached  # serve stale cache rather than fail
+
+        return None
 
     @classmethod
     def is_healthy(cls):

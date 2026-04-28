@@ -4,15 +4,23 @@ Consul Service Registration & Discovery
 import os
 import socket
 import logging
+import time
 import consul
 
 logger = logging.getLogger(__name__)
 
+# Cache resolved URLs briefly to avoid repeated Consul calls (especially during restarts)
+_RESOLVE_CACHE = {}  # { service_name: (expires_at_monotonic, url_or_none) }
+_CACHE_TTL_S = float(os.environ.get("CONSUL_RESOLVE_CACHE_TTL", "10"))
+
 
 def _get_client():
+    # Keep this very small so service restarts don't stall API requests.
+    timeout = float(os.environ.get("CONSUL_TIMEOUT", "0.5"))
     return consul.Consul(
         host=os.environ.get('CONSUL_HOST', 'localhost'),
         port=int(os.environ.get('CONSUL_PORT', 8500)),
+        timeout=timeout,
     )
 
 
@@ -42,15 +50,26 @@ def register_service():
 
 
 def resolve_service(service_name, fallback_env_var=None):
+    now = time.monotonic()
+    cached = _RESOLVE_CACHE.get(service_name)
+    if cached and cached[0] > now:
+        return cached[1] or (os.environ.get(fallback_env_var) if fallback_env_var else None)
+
     try:
         c = _get_client()
         _, services = c.health.service(service_name, passing=True)
         if services:
             svc = services[0]['Service']
-            return f"http://{svc['Address']}:{svc['Port']}"
+            url = f"http://{svc['Address']}:{svc['Port']}"
+            _RESOLVE_CACHE[service_name] = (now + _CACHE_TTL_S, url)
+            return url
     except Exception as exc:
         logger.warning(f"[Consul] Resolution failed for '{service_name}': {exc}")
 
     if fallback_env_var:
-        return os.environ.get(fallback_env_var)
+        url = os.environ.get(fallback_env_var)
+        _RESOLVE_CACHE[service_name] = (now + _CACHE_TTL_S, url)
+        return url
+
+    _RESOLVE_CACHE[service_name] = (now + _CACHE_TTL_S, None)
     return None
