@@ -1,5 +1,6 @@
 import os
 import functools
+import logging
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -13,6 +14,8 @@ from .serializers import (
 )
 from .services import AuthService, AIVerificationService, HistoriqueService
 from .utils import validate_image_file, generate_thumbnail, get_image_dimensions
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_from_request(request):
@@ -192,6 +195,37 @@ def health_api(request):
     return Response({
         'status': 'healthy',
         'service': 'GalleryImage_Service',
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def warmup_api(request):
+    """
+    Auth-cache warm-up endpoint.
+
+    Fires the same auth verification path that image upload triggers.
+    This ensures that after a Gallery service restart, the very first
+    GET /images/ request finds the token already cached — no 401, no retry.
+
+    Returns 200 always (never 401) so the frontend can call this as
+    fire-and-forget without triggering error loops.
+    """
+    user = get_user_from_request(request)
+    if not user:
+        return Response({'warmed': False, 'reason': 'no_token'}, status=200)
+
+    uid = user['user_id']
+    count = Image.objects.filter(user_id=uid).count()
+
+    logger.info(
+        "Warmup completed for user_id=%s — %s images found",
+        uid, count,
+    )
+    return Response({
+        'warmed': True,
+        'user_id': uid,
+        'image_count': count,
     })
 
 

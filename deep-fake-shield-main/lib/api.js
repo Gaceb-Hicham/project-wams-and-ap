@@ -73,6 +73,7 @@ async function apiFetch(baseUrl, path, options = {}) {
   const res = await fetch(url, {
     ...fetchOptions,
     headers,
+    cache: "no-store",
     signal: providedSignal || AbortSignal.timeout(timeoutMs),
   });
 
@@ -232,6 +233,22 @@ export async function getFavorites() {
 // ─── Gallery API — Stats ─────────────────────────────────────
 export async function getStats() {
   return apiFetch(GALLERY_URL, "/gallery/api/stats/");
+}
+
+/**
+ * Warmup — fires a lightweight POST to the Gallery service that primes
+ * the auth token cache after a service restart.  Fire-and-forget safe:
+ * never throws, never returns an error the caller must handle.
+ */
+export async function warmupGallery() {
+  try {
+    return await apiFetch(GALLERY_URL, "/gallery/api/warmup/", {
+      method: "POST",
+      timeoutMs: 6000,
+    });
+  } catch {
+    return null;
+  }
 }
 
 // ─── AI Service — Direct Access (Independent of Gallery) ──────

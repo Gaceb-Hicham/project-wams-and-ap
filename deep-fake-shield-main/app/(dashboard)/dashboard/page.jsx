@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, Image as ImageIcon, Activity, Loader2 } from "lucide-react";
 import GalleryGrid from "@/components/dashboard/GalleryGrid";
-import { getImages, getStats, checkAllServicesHealth } from "@/lib/api";
+import { getImages, getStats, checkAllServicesHealth, warmupGallery } from "@/lib/api";
 
 /**
  * Compute stats from an images array — used as a fallback when
@@ -26,92 +26,99 @@ export default function GalleryPage() {
   const [loadError, setLoadError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const galleryWasDown = useRef(false);
   const retryTimer = useRef(null);
-  const retryCount = useRef(0);
+  const loadingRef = useRef(false);  // mutex — prevents concurrent loads
 
-  // ── Load gallery data (images + stats) ──
+  /**
+   * Load gallery data.  Self-healing: if it fails and no retry is pending,
+   * schedule one.  A mutex prevents overlapping fetches.
+   */
   const loadData = useCallback(async () => {
+    // Prevent concurrent loads — the biggest source of the stuck state
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+
     try {
+      // Quick warmup to prime the auth cache (never throws)
+      await warmupGallery();
+
       const [imgData, statsData] = await Promise.allSettled([
         getImages(),
         getStats(),
       ]);
 
-      let loadedImages = [];
       if (imgData.status === "fulfilled") {
-        loadedImages = imgData.value;
+        const loadedImages = imgData.value;
         setImages(loadedImages);
         setLoadError("");
-        retryCount.current = 0;
+        // Clear any pending retry since we succeeded
+        clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+
+        if (statsData.status === "fulfilled") {
+          setStats(statsData.value);
+        } else {
+          setStats(computeStatsFromImages(loadedImages));
+        }
+        return true;  // success
       } else {
         const err = imgData.reason;
         const details =
           err?.status ? ` (HTTP ${err.status})` : err?.message ? ` (${err.message})` : "";
-        setLoadError(`Gallery data is temporarily unavailable${details}. Retrying in the background.`);
-      }
-
-      if (statsData.status === "fulfilled") {
-        setStats(statsData.value);
-      } else if (loadedImages.length > 0) {
-        // Stats API failed but images loaded — compute locally
-        setStats(computeStatsFromImages(loadedImages));
-      } else if (imgData.status === "fulfilled") {
-        setStats(computeStatsFromImages(loadedImages));
-      }
-
-      // If images failed, retry in the background without trapping the page
-      if (imgData.status !== "fulfilled") {
-        clearTimeout(retryTimer.current);
-        retryCount.current += 1;
-        const delay = Math.min(15000, 2000 * retryCount.current);
-        retryTimer.current = setTimeout(loadData, delay);
+        setLoadError(`Gallery data is temporarily unavailable${details}. Retrying…`);
+        return false;  // failure
       }
     } catch (e) {
-      console.error("Failed to load gallery data:", e);
-      setLoadError("Gallery data is temporarily unavailable. Retrying in the background.");
-      clearTimeout(retryTimer.current);
-      retryCount.current += 1;
-      const delay = Math.min(15000, 2000 * retryCount.current);
-      retryTimer.current = setTimeout(loadData, delay);
+      console.error("loadData error:", e);
+      setLoadError("Gallery data is temporarily unavailable. Retrying…");
+      return false;
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   }, []);
 
-  // ── Health check + auto-reload when gallery recovers ──
-  const loadHealth = useCallback(async () => {
+  // ── Combined health check + data recovery (single polling loop) ──
+  const tick = useCallback(async () => {
+    // 1. Update service health indicators
+    let galleryHealthy = false;
     try {
       const data = await checkAllServicesHealth();
       setHealth(data);
-
-      // If gallery was down and is now back up, reload data automatically
-      if (galleryWasDown.current && data.gallery) {
-        galleryWasDown.current = false;
-        loadData();
-      }
-      // Track if gallery goes down
-      if (!data.gallery) {
-        galleryWasDown.current = true;
-      }
+      galleryHealthy = data.gallery;
     } catch {
       setHealth({ auth: false, gallery: false, ai: false, historique: false });
-      galleryWasDown.current = true;
     }
-  }, [loadData]);
 
+    // 2. If gallery is healthy but we have NO images, try loading
+    //    This is the self-healing core: it keeps trying until it works.
+    if (galleryHealthy && images.length === 0 && !loadingRef.current) {
+      await loadData();
+    }
+  }, [loadData, images.length]);
+
+  // ── Bootstrap + polling ──
   useEffect(() => {
+    // Initial load — always try
     loadData();
-    loadHealth();
 
-    // Poll health every 15s — also triggers data reload on gallery recovery
-    const healthInterval = setInterval(loadHealth, 15000);
+    // Combined health + recovery poll every 8 seconds
+    const interval = setInterval(tick, 8000);
+
+    // Reload on tab focus if gallery data is missing
+    const handleFocus = () => {
+      if (images.length === 0 && !loadingRef.current) {
+        loadData();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
 
     return () => {
-      clearInterval(healthInterval);
+      clearInterval(interval);
       clearTimeout(retryTimer.current);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [loadData, loadHealth]);
+  }, [loadData, tick, images.length]);
 
   const handleImageDeleted = (deletedId) => {
     setImages((prev) => {

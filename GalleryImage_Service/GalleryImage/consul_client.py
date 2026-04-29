@@ -15,13 +15,19 @@ _CACHE_TTL_S = float(os.environ.get("CONSUL_RESOLVE_CACHE_TTL", "10"))
 
 
 def _get_client():
-    # Keep this very small so service restarts don't stall API requests.
+    # Apply a short socket timeout so Consul calls never stall API requests.
+    # We use socket.setdefaulttimeout instead of the consul kwarg because
+    # some versions of python-consul don't support the 'timeout' parameter.
     timeout = float(os.environ.get("CONSUL_TIMEOUT", "0.5"))
-    return consul.Consul(
-        host=os.environ.get('CONSUL_HOST', 'localhost'),
-        port=int(os.environ.get('CONSUL_PORT', 8500)),
-        timeout=timeout,
-    )
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(timeout)
+    try:
+        return consul.Consul(
+            host=os.environ.get('CONSUL_HOST', 'localhost'),
+            port=int(os.environ.get('CONSUL_PORT', 8500)),
+        )
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 def register_service():

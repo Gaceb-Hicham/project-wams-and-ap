@@ -26,4 +26,5 @@ urlpatterns = [
     # ─── Stats & Health ────────────────────────────────────────
     path('api/stats/', api_views.stats_api, name='api_stats'),
     path('api/health/', api_views.health_api, name='api_health'),
+    path('api/warmup/', api_views.warmup_api, name='api_warmup'),
 ]
