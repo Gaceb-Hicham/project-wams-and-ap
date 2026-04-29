@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Fingerprint,
@@ -16,7 +16,7 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import { login, register, saveSession } from "@/lib/api";
+import { login, register, saveSession, isAuthenticated } from "@/lib/api";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -24,6 +24,18 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+
+  const [isChecking, setIsChecking] = useState(true); // New state to prevent flash
+
+  useEffect(() => {
+    // Check if the token exists in localStorage
+    if (isAuthenticated()) {
+      router.replace("/dashboard");
+    } else {
+      setIsChecking(false); // Only show the page if NOT authenticated
+    }
+  }, [router]);
 
   // Form state
   const [form, setForm] = useState({
@@ -91,6 +103,14 @@ export default function AuthPage() {
       setLoading(false);
     }
   };
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-[#0b1326] flex items-center justify-center">
+        <Loader2 className="animate-spin text-[#adc6ff]" size={40} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0b1326] text-[#dae2fd] font-sans selection:bg-[#adc6ff]/30 selection:text-white antialiased overflow-hidden">
