@@ -13,6 +13,17 @@ export default function ImagePreview({ activeImage, onClose, onDelete, onFavorit
   const [isFav, setIsFav] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
 
+  useEffect(() => {
+    if (activeImage) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [activeImage]);
+
   // Lock scroll when modal is open
   useEffect(() => {
     if (activeImage) {
@@ -81,6 +92,9 @@ export default function ImagePreview({ activeImage, onClose, onDelete, onFavorit
   };
 
   const st = statusDisplay[status] || statusDisplay.pending;
+
+
+  if (!activeImage) return null;
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center p-0 md:p-10">
@@ -303,7 +317,10 @@ export default function ImagePreview({ activeImage, onClose, onDelete, onFavorit
 
             {/* Delete */}
             <button
-              onClick={() => onDelete?.(imageData.id)}
+               onClick={(e) => {
+               onDelete?.(imageData.id);
+              onClose();
+               }}
               className="w-full py-4 bg-white/5 text-white/50 rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#eb4141]/10 hover:text-[#eb4141] transition-all"
             >
               <Trash2 size={16} />
