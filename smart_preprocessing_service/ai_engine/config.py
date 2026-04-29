@@ -13,7 +13,7 @@ MODEL_PATH = os.path.join(BASE_DIR, 'models', 'model.pth')
 # ─── Model Architecture ─────────────────────────────────────
 # Options: "resnet18", "mobilenet_v2", "efficientnet_b0"
 # Must match what your teammate used during training.
-MODEL_ARCH = 'resnet18'
+MODEL_ARCH = 'efficientnet_b0'
 
 # ─── Input Parameters ───────────────────────────────────────
 # These MUST match what was used during training.
@@ -35,6 +35,6 @@ CONFIDENCE_THRESHOLD = 0.5
 # When True OR when model.pth doesn't exist, returns mock predictions for testing.
 # Set to False once you have the real model.
 
-# MOCK_MODE = False
-MOCK_MODE = not os.path.exists(MODEL_PATH)
+MOCK_MODE = False
+# MOCK_MODE = not os.path.exists(MODEL_PATH)
 
