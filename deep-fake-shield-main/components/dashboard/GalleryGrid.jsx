@@ -41,7 +41,6 @@ export default function GalleryGrid({ images, onImageDeleted, onImageUpdated }) 
       setActiveImage(null);
       onImageDeleted?.(id);
     } catch (e) {
-      alert("Failed to delete image.");
     }
   };
 
@@ -104,7 +103,6 @@ export default function GalleryGrid({ images, onImageDeleted, onImageUpdated }) 
     try {
       await addImagesToAlbum(albumId, [contextMenu.image.id]);
     } catch {
-      alert("Failed to add to album.");
     }
     closeContextMenu();
   };
